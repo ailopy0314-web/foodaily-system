@@ -1,0 +1,2030 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Foodaily 内容生产系统</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a26;
+  --border: #2a2a3a;
+  --text: #e8e8ef;
+  --text-muted: #8888a0;
+  --accent: #ff6b35;
+  --accent2: #ff8f5e;
+  --new-badge: #00d68f;
+  --new-glow: rgba(0, 214, 143, 0.15);
+  --score-high: #00d68f;
+  --score-mid: #ffaa00;
+  --score-low: #ff4757;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Animated background */
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(255,107,53,0.06), transparent),
+    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(0,214,143,0.04), transparent);
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* Header */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.logo-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.logo-icon {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  box-shadow: 0 4px 20px rgba(255,107,53,0.25);
+}
+.logo-text h1 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, #fff, #ccc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.logo-text p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Refresh Button */
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px rgba(255,107,53,0.3);
+  position: relative;
+  overflow: hidden;
+}
+.refresh-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 6px 30px rgba(255,107,53,0.4);
+}
+.refresh-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+.refresh-btn.spinning .refresh-icon {
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.refresh-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.refresh-btn:hover::after { opacity: 1; }
+
+/* Status bar */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 1.5rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.green { background: var(--score-high); box-shadow: 0 0 8px rgba(0,214,143,0.5); }
+.status-dot.yellow { background: var(--score-mid); box-shadow: 0 0 8px rgba(255,170,0,0.5); }
+.status-dot.red { background: var(--score-low); box-shadow: 0 0 8px rgba(255,71,87,0.5); }
+.status-dot.gray { background: var(--text-muted); }
+.status-label { color: var(--text-muted); }
+.status-value { color: var(--text); font-weight: 600; }
+
+/* Pipeline */
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+}
+.pipeline-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  transition: all 0.3s;
+}
+.pipeline-step.active {
+  border-color: var(--accent);
+  background: rgba(255,107,53,0.08);
+  color: var(--accent);
+}
+.pipeline-step.done {
+  border-color: var(--score-high);
+  background: rgba(0,214,143,0.06);
+  color: var(--score-high);
+}
+.pipeline-arrow {
+  color: var(--text-muted);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+.filter-chip {
+  padding: 0.4rem 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-muted);
+}
+.filter-chip:hover, .filter-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,107,53,0.08);
+}
+
+/* Topic Card */
+.topic-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.topic-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+.topic-card:hover {
+  border-color: rgba(255,107,53,0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+.topic-card.is-new {
+  border-color: rgba(0,214,143,0.3);
+  background: linear-gradient(135deg, var(--surface), var(--new-glow));
+}
+.topic-card.is-new::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--new-badge), transparent);
+}
+
+/* New badge */
+.new-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.6rem;
+  background: rgba(0,214,143,0.12);
+  border: 1px solid rgba(0,214,143,0.25);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--new-badge);
+  animation: newPulse 2s ease-in-out infinite;
+}
+@keyframes newPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Score */
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.score-high { background: rgba(0,214,143,0.12); color: var(--score-high); }
+.score-mid { background: rgba(255,170,0,0.12); color: var(--score-mid); }
+.score-low { background: rgba(255,71,87,0.12); color: var(--score-low); }
+
+/* Topic header */
+.topic-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.topic-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.5;
+  flex: 1;
+}
+.topic-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.topic-original {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--border);
+}
+.topic-angle {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-bottom: 0.75rem;
+}
+.topic-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.topic-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.topic-info a {
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.topic-info a:hover { opacity: 0.8; }
+
+/* Generate button */
+.gen-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text-muted);
+}
+.gen-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,107,53,0.08);
+  transform: scale(1.03);
+}
+.gen-btn.active {
+  border-color: var(--new-badge);
+  color: var(--new-badge);
+  background: rgba(0,214,143,0.08);
+}
+.gen-btn.generating {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(255,107,53,0.08);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: var(--text-muted);
+}
+.empty-icon { font-size: 3rem; margin-bottom: 1rem; }
+.empty-title { font-size: 1.2rem; font-weight: 600; color: var(--text); margin-bottom: 0.5rem; }
+.empty-desc { font-size: 0.9rem; line-height: 1.6; }
+
+/* Loading */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,15,0.85);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 1.5rem;
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.loading-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+.loader {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.loading-text {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+.loading-sub {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+/* Article modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10,10,15,0.9);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.modal-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+.modal-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2rem;
+  max-width: 800px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  position: relative;
+}
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  transition: all 0.2s;
+}
+.modal-close:hover {
+  border-color: var(--score-low);
+  color: var(--score-low);
+}
+.article-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+.article-meta {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.article-body {
+  font-size: 0.95rem;
+  line-height: 1.85;
+  color: #ccc;
+}
+.article-body h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 1.5rem 0 0.75rem;
+}
+.article-body p {
+  margin-bottom: 1rem;
+}
+.compliance-section {
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+.compliance-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--score-mid);
+  margin-bottom: 0.75rem;
+}
+.compliance-item {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.compliance-item:last-child { border-bottom: none; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Responsive */
+@media (max-width: 640px) {
+  .container { padding: 1rem; }
+  .header { margin-bottom: 1.5rem; }
+  .logo-text h1 { font-size: 1.2rem; }
+  .topic-card { padding: 1rem; }
+  .topic-title { font-size: 0.95rem; }
+}
+
+/* Backend Status */
+.backend-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.75rem;
+  transition: all 0.2s;
+}
+.backend-status:hover { background: var(--surface2); }
+.backend-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+}
+.backend-dot.green { background: var(--new-badge); box-shadow: 0 0 6px var(--new-badge); }
+.backend-dot.yellow { background: var(--score-mid); }
+.backend-dot.gray { background: var(--text-muted); }
+.backend-dot.red { background: var(--score-low); }
+.backend-label { color: var(--text-muted); }
+
+/* Log Panel */
+.log-panel {
+  margin-top: 2rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.log-close {
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 1rem;
+}
+.log-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 8px;
+}
+.log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.log-entry:hover { background: var(--surface2); }
+.log-time { color: var(--text-muted); opacity: 0.6; white-space: nowrap; }
+.log-icon { flex-shrink: 0; }
+.log-msg { color: var(--text); }
+.log-detail { color: var(--accent2); opacity: 0.7; }
+.log-info .log-msg { color: var(--text); }
+.log-warn .log-msg { color: var(--score-mid); }
+.log-error .log-msg { color: var(--score-low); }
+.log-success .log-msg { color: var(--new-badge); }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loader"></div>
+  <div class="loading-text" id="loadingText">正在抓取资讯...</div>
+  <div class="loading-sub" id="loadingSub">模拟 Foodaily 内容生产流程</div>
+</div>
+
+<!-- Article Modal -->
+<div class="modal-overlay" id="articleModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-group">
+      <div class="logo-icon">🍽</div>
+      <div class="logo-text">
+        <h1>Foodaily 内容生产系统</h1>
+        <p>资讯抓取 → 选题筛选 → 内容生成 → 合规审核</p>
+      </div>
+    </div>
+    <button class="refresh-btn" id="refreshBtn" onclick="runPipeline()">
+      <span class="refresh-icon">↻</span>
+      刷新选题
+    </button>
+    <div class="backend-status" id="backendStatus" title="后端连接状态" onclick="toggleLogPanel()">
+      <span class="backend-dot gray" id="backendDot"></span>
+      <span class="backend-label" id="backendLabel">检测中...</span>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <div class="pipeline">
+    <div class="pipeline-step" id="pipe1">
+      <span>🔍</span> 资讯抓取
+    </div>
+    <span class="pipeline-arrow">→</span>
+    <div class="pipeline-step" id="pipe2">
+      <span>🎯</span> 选题筛选
+    </div>
+    <span class="pipeline-arrow">→</span>
+    <div class="pipeline-step" id="pipe3">
+      <span>✍️</span> 内容生成
+    </div>
+    <span class="pipeline-arrow">→</span>
+    <div class="pipeline-step" id="pipe4">
+      <span>🛡️</span> 合规审核
+    </div>
+  </div>
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <div class="status-item">
+      <div class="status-dot gray" id="statusDot"></div>
+      <span class="status-label">状态：</span>
+      <span class="status-value" id="statusText">待刷新</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">资讯数：</span>
+      <span class="status-value" id="newsCount">0</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">选题数：</span>
+      <span class="status-value" id="topicCount">0</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">本轮新增：</span>
+      <span class="status-value" id="newCount" style="color:var(--new-badge)">0</span>
+    </div>
+    <div class="status-item">
+      <span class="status-label">上次刷新：</span>
+      <span class="status-value" id="lastUpdate">-</span>
+    </div>
+  </div>
+
+  <!-- Filter -->
+  <div class="filter-bar" id="filterBar" style="display:none">
+    <div class="filter-chip active" data-filter="all" onclick="setFilter('all')">全部</div>
+    <div class="filter-chip" data-filter="new" onclick="setFilter('new')">🆕 本轮新增</div>
+    <div class="filter-chip" data-filter="score5" onclick="setFilter('score5')">⭐ 5分</div>
+    <div class="filter-chip" data-filter="score4" onclick="setFilter('score4')">🔥 4分+</div>
+    <div class="filter-chip" data-filter="recommend" onclick="setFilter('recommend')">✅ 推荐</div>
+  </div>
+
+  <!-- Topic List -->
+  <div id="topicList">
+    <div class="empty-state">
+      <div class="empty-icon">📡</div>
+      <div class="empty-title">等待资讯抓取</div>
+      <div class="empty-desc">点击右上角「刷新选题」按钮，启动资讯侦察员<br>从全球食品行业信息源抓取最新资讯</div>
+    </div>
+  </div>
+
+  <!-- Log Panel -->
+  <div id="logPanel" class="log-panel" style="display:none">
+    <div class="log-header">
+      <span>📋 运行日志</span>
+      <button class="log-close" onclick="toggleLogPanel()">✕</button>
+    </div>
+    <div id="logList" class="log-list"></div>
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+let currentTopics = [];
+let previousTopicIds = new Set();
+let currentFilter = 'all';
+let isRunning = false;
+
+// ============ LOG SYSTEM ============
+const logs = [];
+function logger(type, message, detail) {
+  const icons = { info: 'ℹ️', warn: '⚠️', error: '❌', success: '✅' };
+  const entry = {
+    time: new Date().toLocaleTimeString('zh-CN'),
+    type,
+    message,
+    detail: detail || '',
+  };
+  logs.unshift(entry);
+  if (logs.length > 50) logs.pop();
+  console.log(`[${type.toUpperCase()}] ${message} ${detail}`);
+
+  // Update log panel if visible
+  const logPanel = document.getElementById('logPanel');
+  if (logPanel) {
+    const logList = document.getElementById('logList');
+    if (logList) {
+      logList.innerHTML = logs.map(l =>
+        `<div class="log-entry log-${l.type}">
+          <span class="log-time">${l.time}</span>
+          <span class="log-icon">${icons[l.type] || '•'}</span>
+          <span class="log-msg">${l.message}</span>
+          ${l.detail ? `<span class="log-detail">${l.detail}</span>` : ''}
+        </div>`
+      ).join('');
+    }
+  }
+}
+
+// ============ SOURCE DATABASE ============
+// 从素材矩阵中提取的核心信息源（优先A级）
+const SOURCES = [
+  { name: "Shin-shouhin", region: "日本", url: "http://www.shin-shouhin.com/", level: "A", type: "新品发布" },
+  { name: "Foods news", region: "日本", url: "http://foodsnews.com", level: "A", type: "新品发布" },
+  { name: "Mognavi", region: "日本", url: "https://mognavi.jp/do/whats_new/show", level: "A", type: "新品&评测" },
+  { name: "日経クロストレンド", region: "日本", url: "https://xtrend.nikkei.com/", level: "A", type: "综合&分析" },
+  { name: "Trend Hunter", region: "北美", url: "www.trendhunter.com", level: "A", type: "趋势追踪" },
+  { name: "Food Dive", region: "北美", url: "https://www.fooddive.com", level: "A+", type: "行业深度" },
+  { name: "Cision PR Newswire", region: "北美", url: "https://www.prnewswire.com/news-releases/", level: "A", type: "新闻稿" },
+  { name: "Foodbev", region: "北美", url: "http://www.foodbev.com", level: "A+", type: "行业资讯" },
+  { name: "Prepared Foods", region: "北美", url: "https://www.preparedfoods.com", level: "A+", type: "行业技术" },
+  { name: "Food Business News", region: "北美", url: "http://www.foodbusinessnews.net/", level: "A+", type: "行业商业" },
+  { name: "Food Navigator", region: "北美", url: "https://www.foodnavigator-usa.com/", level: "A+", type: "行业导航" },
+  { name: "Just Food", region: "欧洲", url: "https://www.just-food.com/", level: "A", type: "行业资讯" },
+  { name: "Beverage Daily", region: "欧洲", url: "https://www.beveragedaily.com/", level: "A", type: "饮料行业" },
+  { name: "Confectionery News", region: "欧洲", url: "https://www.confectionerynews.com/", level: "A", type: "糖巧行业" },
+  { name: "Dairy Reporter", region: "欧洲", url: "https://www.dairyreporter.com/", level: "A", type: "乳制品" },
+  { name: "NutraIngredients", region: "欧洲", url: "https://www.nutraingredients.com/", level: "A", type: "营养配料" },
+  { name: "Food Navigator Europe", region: "欧洲", url: "https://www.foodnavigator.com/", level: "A+", type: "欧洲食品" },
+  { name: "FBIF", region: "国内", url: "公众号", level: "A+", type: "食品商业" },
+  { name: "精准营养", region: "国内", url: "公众号", level: "A+", type: "功能食品" },
+  { name: "新饮料", region: "国内", url: "公众号", level: "A+", type: "饮料行业" },
+  { name: "食研汇FTA", region: "国内", url: "公众号", level: "A", type: "食品研发" },
+];
+
+// ============ SIMULATED NEWS GENERATOR ============
+// 模拟从各信息源抓取的食品行业资讯（实际生产中替换为真实抓取）
+const NEWS_TEMPLATES = [
+  {
+    titles: [
+      "三得利推出功能性标识食品「カラダ調製茶」 改善血糖",
+      "伊藤园新品「STYLE 無糖ストロベリー」水果茶系列扩展",
+      "朝日饮料发布「三ツ矢サイダー」全新乳酸菌口味",
+      "キリン「生茶」系列新增功能性茶饮 改善脂肪代谢",
+      "コカ・コーラ日本推出「綾鷹」茶饮料新配方",
+    ],
+    category: "新品",
+    tags: ["日本", "饮料", "功能食品"]
+  },
+  {
+    titles: [
+      "Oatly推出全新燕麦奶冰淇淋系列 进军冷冻甜品",
+      "Beyond Meat发布第三代植物基肉排 蛋白质含量提升30%",
+      "Impossible Foods推出植物基鸡块 首次进入快餐渠道",
+      "Upfield集团发布植物基奶油新品 减少饱和脂肪50%",
+    ],
+    category: "新品",
+    tags: ["欧美", "植物基"]
+  },
+  {
+    titles: [
+      "欧盟批准新型甜味蛋白Brazzein作为食品添加剂",
+      "中国市场监管总局发布保健食品原料目录更新",
+      "FDA更新食品标签法规 要求明确标注添加糖含量",
+      "日本消费者厅修订功能性标识食品制度 新增报告义务",
+    ],
+    category: "法规",
+    tags: ["法规", "政策"]
+  },
+  {
+    titles: [
+      "全球功能性饮料市场2025年预计突破2000亿美元",
+      "Innova报告：2025年食品饮料十大趋势发布",
+      "Mintel数据显示亚太地区无糖饮料增速达25%",
+      "凯度报告：中国即饮茶市场超越碳酸饮料",
+    ],
+    category: "趋势",
+    tags: ["市场数据", "趋势"]
+  },
+  {
+    titles: [
+      "Nestlé收购益生菌初创公司 提升肠道健康产品线",
+      "达能投资精准营养平台 个性化营养成新赛道",
+      "百事公司3亿美元投资功能性零食品牌Poppi",
+      "联合利华食品部门重组 加速植物基布局",
+      "蒙牛推出原生益生菌牛奶菌株 自主研发突破",
+    ],
+    category: "品牌",
+    tags: ["品牌", "投资"]
+  },
+  {
+    titles: [
+      "微胶囊技术突破 益生菌存活率提升至90%以上",
+      "3D打印食品技术商业化加速 首款定制营养零食上市",
+      "AI调味系统助力减盐30%而不牺牲风味体验",
+      "新型发酵技术使植物蛋白口感逼近动物蛋白",
+    ],
+    category: "技术",
+    tags: ["技术", "创新"]
+  },
+  {
+    titles: [
+      "Z世代消费者对功能性零食的偏好调查发布",
+      "调研显示70%消费者愿为清洁标签支付溢价",
+      "中国银发族营养补充市场增长35% 骨健康需求领先",
+      "全球消费者情绪追踪：可持续性仍是购买决策因子",
+    ],
+    category: "消费",
+    tags: ["消费趋势", "洞察"]
+  },
+  {
+    titles: [
+      "帝斯曼-芬美意推出新型乳制品发酵菌株 缩短发酵时间",
+      "Givaudan发布2025风味趋势报告 亚洲风味崛起",
+      "IFF推出天然着色解决方案 应对清洁标签需求",
+      "ADM投资精准发酵设施 扩大替代蛋白产能",
+    ],
+    category: "原料",
+    tags: ["配料", "供应链"]
+  }
+];
+
+function generateNewsItems() {
+  const items = [];
+  const now = new Date();
+  const usedIndices = new Set();
+
+  // 从每个类别随机选取1-3条
+  NEWS_TEMPLATES.forEach((template, catIdx) => {
+    const count = Math.floor(Math.random() * 2) + 1;
+    const available = [...Array(template.titles.length).keys()];
+
+    for (let i = 0; i < count && available.length > 0; i++) {
+      const randArrIdx = Math.floor(Math.random() * available.length);
+      const titleIdx = available.splice(randArrIdx, 1)[0];
+
+      const source = SOURCES[Math.floor(Math.random() * SOURCES.length)];
+      const hoursAgo = Math.floor(Math.random() * 72) + 1;
+      const pubDate = new Date(now - hoursAgo * 3600000);
+
+      items.push({
+        title: template.titles[titleIdx],
+        date: pubDate.toISOString().slice(0, 16).replace('T', ' '),
+        source: source.name,
+        url: source.url,
+        category: template.category,
+        tags: template.tags,
+        summary: generateSummary(template.titles[titleIdx], template.category),
+        hoursAgo: hoursAgo
+      });
+    }
+  });
+
+  // Sort by date
+  items.sort((a, b) => new Date(b.date) - new Date(a.date));
+  return items;
+}
+
+function generateSummary(title, category) {
+  const summaries = {
+    "新品": "品牌推出新产品，瞄准特定消费需求与市场机会。",
+    "法规": "监管机构发布新规，影响食品行业合规与产品开发方向。",
+    "趋势": "市场数据揭示品类增长与消费偏好变化的新动向。",
+    "品牌": "头部品牌战略调整，反映行业竞争格局演变。",
+    "技术": "新技术突破为产品创新与工艺优化提供新可能。",
+    "消费": "消费者调研数据揭示需求变化与购买决策因素。",
+    "原料": "配料供应商推出新方案，响应下游产品创新需求。"
+  };
+  return summaries[category] || "食品行业最新动态。";
+}
+
+// ============ TOPIC EVALUATOR ============
+function evaluateTopics(newsItems) {
+  return newsItems.map((item, idx) => {
+    const score = calculateScore(item);
+    const recommend = score >= 3;
+    const newTitle = rewriteTitle(item);
+    const angle = generateAngle(item);
+
+    return {
+      id: `T${String(idx + 1).padStart(3, '0')}`,
+      original_title: item.title,
+      new_title: newTitle,
+      angle: angle,
+      score: score,
+      recommend: recommend,
+      url: item.url,
+      source: item.source,
+      date: item.date,
+      category: item.category,
+      tags: item.tags,
+      generate_article: false,
+      isNew: false // will be set by diff logic
+    };
+  });
+}
+
+function calculateScore(item) {
+  let score = 3;
+  if (item.category === '趋势' || item.category === '法规') score += 1;
+  if (item.tags && item.tags.includes('功能食品')) score += 0.5;
+  if (item.tags && item.tags.includes('植物基')) score += 0.5;
+  if (item.hoursAgo <= 24) score += 0.5;
+
+  // 英文标题额外加分（真实抓取的数据更有价值）
+  const title = item.title || '';
+  const isEnglish = /^[A-Za-z]/.test(title);
+  if (isEnglish) score += 0.3;
+
+  // 包含关键热门词加分
+  const hotWords = ['plant-based', 'AI', 'sustainability', 'protein', 'fermentation',
+                    'alternative', 'functional', 'personalized', 'supply chain',
+                    '植物基', '功能食品', '可持续', '替代蛋白', '精准营养'];
+  if (hotWords.some(w => title.toLowerCase().includes(w.toLowerCase()))) score += 0.5;
+
+  if (Math.random() > 0.6) score += 0.5; // editorial judgment factor
+  return Math.min(5, Math.max(1, Math.round(score)));
+}
+
+function rewriteTitle(item) {
+  const title = item.title;
+  const isEnglish = /^[A-Za-z]/.test(title);
+
+  // 英文标题：先做关键信息提取，再生成中文改写
+  if (isEnglish) {
+    return rewriteEnglishTitle(title, item.category);
+  }
+
+  // 中文标题改写
+  const rewrites = {
+    "新品": [
+      title + "，这个品类又多了什么新变量？",
+      title.split('推出')[0] + "再落子：" + title.split('推出')[1]?.slice(0, 15) + "…背后是何种逻辑？",
+      "从" + title + "，看品类创新的三种可能",
+    ],
+    "法规": [
+      "法规更新：" + title + "对行业意味着什么？",
+      title + "——合规先行者的窗口期",
+    ],
+    "趋势": [
+      title.replace('报告', '深度') + "，读懂背后的消费逻辑",
+      title.split('：')[0] + "：数据背后的真实信号",
+    ],
+    "品牌": [
+      title.split('投资')[0] + "加注：" + (title.split('投资')[1]?.slice(0, 15) || "新赛道") + "为何值得押注？",
+      title.split('推出')[0] + "的战略转身",
+    ],
+    "技术": [
+      title + "，离商业化还有多远？",
+      title.split('突破')[0] + "突破之后：" + (title.split('突破')[1]?.slice(0, 10) || "行业影响"),
+    ],
+    "消费": [
+      title + "，品牌该如何回应？",
+      title.split('显示')[0] + "背后的消费心理",
+    ],
+    "原料": [
+      title + "，供应链上游的新变量",
+      title.split('推出')[0] + "新方案：" + (title.split('推出')[1]?.slice(0, 15) || "行业变革"),
+    ]
+  };
+
+  const options = rewrites[item.category] || [title];
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function rewriteEnglishTitle(engTitle, category) {
+  // 从英文标题中提取品牌名和核心事件
+  const t = engTitle;
+
+  // 提取可能的品牌名（标题第一个词或专有名词）
+  const brandMatch = t.match(/^([A-Z][a-z]+(?:\s[A-Z][a-z]+)*)/);
+  const brand = brandMatch ? brandMatch[1] : '';
+
+  // 品牌名映射（常见食品品牌中英对照）
+  const brandMap = {
+    'Nestlé': '雀巢', 'Coca-Cola': '可口可乐', 'PepsiCo': '百事',
+    'Unilever': '联合利华', 'Danone': '达能', 'Mars': '玛氏',
+    'Mondelez': '亿滋', 'Kellanova': '家乐氏', 'General Mills': '通用磨坊',
+    'Anheuser-Busch': '百威英博', 'Hershey': '好时', 'Kellogg': '家乐氏',
+    'Beyond Meat': 'Beyond Meat', 'Impossible': 'Impossible',
+    'Oatly': 'Oatly', 'Abbott': '雅培', 'Kraft': '卡夫',
+    'Capri Sun': '果倍爽', 'Quest': 'Quest', 'Laird': 'Laird',
+    'Ofi': 'Ofi', 'Simply Good': 'Simply Good', 'Vandemoortele': 'Vandemoortele',
+    'Granarolo': 'Granarolo',
+  };
+
+  const cnBrand = brandMap[brand] || brand;
+
+  // 按类别生成Foodaily风格改写
+  const patterns = {
+    "新品": [
+      cnBrand + "上新，这个赛道又挤进一个玩家",
+      cnBrand + "出手了，新品背后藏着什么品类判断？",
+      "海外新品速递：" + cnBrand + "的这步棋意味着什么？",
+    ],
+    "法规": [
+      "海外法规变动：" + engTitle.slice(0, 40) + "，对中国市场有何启示？",
+      cnBrand + "合规新动态，行业窗口期在哪儿？",
+    ],
+    "趋势": [
+      cnBrand + "的动作，折射出什么行业信号？",
+      "从" + cnBrand + "看全球食品趋势的下一步",
+      engTitle.slice(0, 35) + "…全球市场正在发生什么？",
+    ],
+    "品牌": [
+      cnBrand + "的战略调整，意味着什么？",
+      cnBrand + "出手，这个赛道要变天？",
+      "拆解" + cnBrand + "最新动作：增长逻辑与竞争格局",
+    ],
+    "技术": [
+      cnBrand + "技术突破，离上架还有多远？",
+      "食品科技新进展：" + cnBrand + "这次做对了什么？",
+    ],
+    "消费": [
+      cnBrand + "观察：消费者到底想要什么？",
+      "数据说话：" + engTitle.slice(0, 30) + "背后的消费真相",
+    ],
+    "原料": [
+      "供应链上游变局：" + cnBrand + "的这步棋影响几何？",
+      cnBrand + "原料新方案，看上游如何驱动产品创新",
+    ],
+  };
+
+  const options = patterns[category] || [cnBrand + "动态：海外食品行业最新信号"];
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function generateAngle(item) {
+  const angles = {
+    "新品": "从产品创新看品类演进方向与差异化空间",
+    "法规": "政策变化对产品开发与市场准入的实际影响",
+    "趋势": "数据解读：消费偏好变化的深层驱动与品牌应对",
+    "品牌": "战略布局背后的行业竞争逻辑与增长路径",
+    "技术": "技术商业化进程及对产品形态的重塑潜力",
+    "消费": "需求变迁中的品牌沟通与产品匹配策略",
+    "原料": "配料创新如何驱动下游产品差异化与价值提升"
+  };
+  return angles[item.category] || "行业动态解读与趋势分析";
+}
+
+// ============ DIFF LOGIC ============
+function markNewTopics(topics) {
+  const currentIds = new Set(topics.map(t => t.original_title));
+
+  topics.forEach(t => {
+    // If this title wasn't in the previous run, mark as new
+    if (!previousTopicIds.has(t.original_title)) {
+      t.isNew = true;
+    }
+  });
+
+  // Update previous set for next run
+  previousTopicIds = currentIds;
+  return topics;
+}
+
+// ============ PIPELINE ============
+// API地址：优先云端，回退本地
+const CLOUD_API = 'https://foodaily-scraper.onrender.com';
+const LOCAL_API = 'http://localhost:5000';
+let API_BASE = CLOUD_API; // 默认云端
+let useRealAPI = false; // 检测后端是否可用
+
+async function checkBackend() {
+  const dot = document.getElementById('backendDot');
+  const label = document.getElementById('backendLabel');
+  
+  // 先尝试云端
+  try {
+    const resp = await fetch(CLOUD_API + '/api/health', { signal: AbortSignal.timeout(5000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      API_BASE = CLOUD_API;
+      useRealAPI = true;
+      dot.className = 'backend-dot green';
+      label.textContent = '真实数据（云端）';
+      logger('info', '云端后端连接成功', data.scrapers + '个爬虫 + ' + data.rss_feeds + '个RSS源');
+      return true;
+    }
+  } catch (e) {
+    logger('info', '云端后端不可用，尝试本地...');
+  }
+  
+  // 回退本地
+  try {
+    const resp = await fetch(LOCAL_API + '/api/health', { signal: AbortSignal.timeout(3000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      API_BASE = LOCAL_API;
+      useRealAPI = true;
+      dot.className = 'backend-dot green';
+      label.textContent = '真实数据（本地）';
+      logger('info', '本地后端连接成功', data.scrapers + '个爬虫 + ' + data.rss_feeds + '个RSS源');
+      return true;
+    }
+  } catch (e) {
+    // 本地也不行
+  }
+  
+  useRealAPI = false;
+  API_BASE = CLOUD_API;
+  dot.className = 'backend-dot yellow';
+  label.textContent = '模拟数据';
+  logger('warn', '后端未启动，使用模拟数据');
+  return false;
+}
+
+function toggleLogPanel() {
+  const panel = document.getElementById('logPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+async function fetchRealNews() {
+  // 触发抓取
+  const scrapeResp = await fetch(API_BASE + '/api/scrape?force=1', { method: 'POST' });
+  const scrapeData = await scrapeResp.json();
+
+  if (scrapeData.status === 'cached') {
+    // 直接返回缓存
+    return scrapeData.items;
+  }
+
+  // 等待抓取完成（轮询）
+  for (let i = 0; i < 60; i++) {
+    await delay(2000);
+    const statusResp = await fetch(API_BASE + '/api/status');
+    const statusData = await statusResp.json();
+
+    if (!statusData.scraping) {
+      // 抓取完成，获取结果
+      const newsResp = await fetch(API_BASE + '/api/news?per_page=100');
+      const newsData = await newsResp.json();
+      return newsData.items || [];
+    }
+  }
+
+  // 超时，返回已有的缓存
+  const newsResp = await fetch(API_BASE + '/api/news?per_page=100');
+  const newsData = await newsResp.json();
+  return newsData.items || [];
+}
+
+function classifyNewsCategory(title, sourceCategory) {
+  // 根据标题关键词智能分类（支持中英文）
+  const titleLower = title.toLowerCase();
+  const categoryMap = {
+    '新品': ['launch', 'debut', 'new product', 'release', 'introduc', 'unveil', 'roll out',
+             '推出', '发布', '上市', '新品', '首发', '新品类'],
+    '法规': ['regulation', 'fda', 'compliance', 'ban', 'approved', 'legislation',
+             '法规', '监管', '批准', '备案', '标准', '禁令'],
+    '趋势': ['trend', 'market', 'growth', 'forecast', 'report', 'survey', 'data',
+             '趋势', '市场', '增长', '规模', '预测', '报告', '调研'],
+    '品牌': ['acquisition', 'invest', 'partnership', 'merger', 'restructure', 'buy', 'deal',
+             '收购', '投资', '合作', '战略', '布局', '重组'],
+    '技术': ['technology', 'innovation', 'research', 'breakthrough', 'ingredient tech',
+             '技术', '创新', '研发', '突破', '工艺', '发酵'],
+    '消费': ['consumer', 'survey', 'preference', 'demand', 'behavior', 'shopping',
+             '消费者', '调研', '偏好', '需求', '购买', '行为'],
+    '原料': ['ingredient', 'supplier', 'raw material', 'supply chain', 'sourcing',
+             '原料', '配料', '供应链', '菌株', '添加剂'],
+  };
+
+  for (const [cat, keywords] of Object.entries(categoryMap)) {
+    if (keywords.some(kw => titleLower.includes(kw))) {
+      return cat;
+    }
+  }
+
+  // 根据source category回退
+  const sourceCatMap = {
+    '行业深度': '品牌', '行业导航': '趋势', '行业商业': '品牌',
+    '行业技术': '技术', '行业资讯': '趋势', '趋势追踪': '趋势',
+    '新闻稿': '新品', '新品发布': '新品', '新品&评测': '新品',
+    '综合分析': '趋势', '营养配料': '原料', '乳制品': '新品',
+    '饮料行业': '新品', '欧洲食品': '趋势', '食品商业': '品牌',
+    '糖巧行业': '新品',
+  };
+  return sourceCatMap[sourceCategory] || '趋势';
+}
+
+function generateRegionTag(region) {
+  const map = { '北美': '欧美', '欧洲': '欧美', '日本': '日本', '国内': '国内' };
+  return map[region] || '国际';
+}
+
+async function runPipeline() {
+  if (isRunning) return;
+  isRunning = true;
+
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+
+  // 检测后端
+  const backendOk = await checkBackend();
+
+  let newsItems = [];
+
+  // Step 1: Scouting
+  setPipeline(1);
+
+  if (backendOk && useRealAPI) {
+    showLoading('资讯侦察员正在抓取...', '从真实信息源中采集最新资讯（可能需要1-2分钟）');
+    try {
+      const realNews = await fetchRealNews();
+      // 转换真实数据为前端格式
+      newsItems = realNews.map(item => ({
+        title: item.title,
+        date: item.date || '',
+        source: item.source,
+        url: item.url,
+        category: classifyNewsCategory(item.title, item.category),
+        tags: [generateRegionTag(item.region || ''), item.category],
+        summary: item.summary || '',
+        hoursAgo: item.date ? Math.max(1, Math.floor((Date.now() - new Date(item.date).getTime()) / 3600000)) : 48,
+      }));
+      logger('success', '真实抓取完成', newsItems.length + '条资讯');
+    } catch (e) {
+      logger('error', '真实抓取失败，回退模拟数据', e.message);
+      newsItems = generateNewsItems();
+    }
+  } else {
+    showLoading('资讯侦察员正在抓取...', '使用模拟数据（启动后端可获取真实资讯）');
+    await delay(1500);
+    newsItems = generateNewsItems();
+  }
+
+  document.getElementById('newsCount').textContent = newsItems.length;
+  updateStatus('yellow', '选题筛选中...');
+
+  // Step 2: Selection
+  setPipeline(2);
+  showLoading('选题策划专家正在评估...', '对 ' + newsItems.length + ' 条资讯进行选题判断');
+  await delay(1000);
+
+  let topics = evaluateTopics(newsItems);
+
+  // Mark new topics by diffing with previous
+  topics = markNewTopics(topics);
+
+  // Only keep recommended topics
+  const recommended = topics.filter(t => t.recommend);
+
+  currentTopics = recommended;
+  document.getElementById('topicCount').textContent = recommended.length;
+  document.getElementById('newCount').textContent = recommended.filter(t => t.isNew).length;
+  document.getElementById('lastUpdate').textContent = new Date().toLocaleString('zh-CN');
+  document.getElementById('filterBar').style.display = 'flex';
+
+  hideLoading();
+  renderTopics();
+  setPipeline(0); // reset pipeline display
+  updateStatus('green', '就绪');
+
+  btn.classList.remove('spinning');
+  isRunning = false;
+}
+
+// ============ ARTICLE GENERATION ============
+async function generateArticle(topicId) {
+  const topic = currentTopics.find(t => t.id === topicId);
+  if (!topic) return;
+
+  const btn = document.querySelector(`[data-topic-id="${topicId}"] .gen-btn`);
+  if (btn) {
+    btn.classList.add('generating');
+    btn.textContent = '生成中...';
+  }
+
+  setPipeline(3);
+  showLoading('内容写手正在撰写...', topic.new_title);
+  await delay(2500);
+
+  const article = writeArticle(topic);
+
+  setPipeline(4);
+  showLoading('合规审核员正在检查...', '审核功效宣称 / 法规风险 / 事实准确性');
+  await delay(1200);
+
+  const compliance = reviewCompliance(article);
+
+  hideLoading();
+  setPipeline(0);
+
+  // Update topic state
+  topic.generate_article = true;
+  if (btn) {
+    btn.classList.remove('generating');
+    btn.classList.add('active');
+    btn.textContent = '✓ 已生成';
+    btn.onclick = () => showModal(topic, article, compliance);
+  }
+
+  showModal(topic, article, compliance);
+}
+
+function writeArticle(topic) {
+  // ==============================
+  // Foodaily 风格写手 v3.0
+  // 基于4篇真实Foodaily公众号文章深度分析：
+  // 1. 酵母蛋白白皮书（~4500字，QA专访+深度报道）
+  // 2. 明前龙井行业分析（~3800字，盘点→归因→方法论）
+  // 3. 优诺冰淇淋品牌解读（~4800字，趋势→创新→技术→战略递进）
+  // 4. 海天跨界现象解读（~3100字，现象→数据→壁垒→案例对比→结论）
+  //
+  // 核心规律：
+  // - 字数3000-5000字（不是800字）
+  // - 每个小节3-6个自然段，不是1-2句话
+  // - 大量具体品牌名、产品名、数据、价格
+  // - 小标题是观点/判断，不是分类标签
+  // - 开头有明确"文眼"——一句话定调
+  // - 不急于给结论，先充分展开
+  // - 文章类型决定结构：QA式/盘点式/递进式/对比式
+  // ==============================
+
+  const tag = topic.tags[0] || '';
+  const tag2 = topic.tags[1] || '';
+  const brand = extractBrand(topic.original_title);
+  const cat = topic.category;
+
+  // ---- 数据库：行业数据、品牌案例、价格信息 ----
+  const DATA = {
+    "饮料": {
+      brands: ["农夫山泉","元气森林","三得利","伊藤园","东方树叶","果子熟了","香飘飘","让茶"],
+      products: ["无糖茶","功能饮料","气泡水","轻乳茶","即饮茶","果茶"],
+      numbers: ["无糖饮料市场增速25%","即饮茶超越碳酸饮料","中国茶饮市场突破5000亿","功能饮料市场突破2000亿美元"],
+      prices: ["6-8元/瓶","12-16元/杯","3-5元/罐"],
+    },
+    "植物基": {
+      brands: ["Oatly","Beyond Meat","Impossible Foods","Upfield","星期零","珍肉"],
+      products: ["植物基奶","植物基肉排","植物基鸡块","植物基奶油","植物奶冰淇淋"],
+      numbers: ["植物基食品市场年增15%","植物蛋白占比提升至12%","亚太植物基增速全球最快"],
+      prices: ["20-35元/瓶","15-25元/份","8-12元/杯"],
+    },
+    "功能食品": {
+      brands: ["汤臣倍健","Swisse","安琪酵母","华熙生物","蒙牛","伊利"],
+      products: ["益生菌粉","蛋白粉","功能茶饮","GABA软糖","玻尿酸饮品","酵母蛋白"],
+      numbers: ["功能食品市场规模突破6000亿","益生菌市场增速30%","银发营养市场增长35%","45%成年居民蛋白摄入不足"],
+      prices: ["50-120元/盒","30-60元/瓶","10-20元/条"],
+    },
+    "日本": {
+      brands: ["三得利","伊藤园","朝日","麒麟","可口可乐日本","森永","好丽友"],
+      products: ["功能标识食品","无糖茶","乳酸菌饮料","高蛋白零食"],
+      numbers: ["日本功能标识食品超3000款","日本无糖茶占比超60%"],
+      prices: ["150-200日元","100-140日元"],
+    },
+    "欧美": {
+      brands: ["Nestlé","PepsiCo","Unilever","Danone","General Mills","Kellogg"],
+      products: ["植物基替代品","功能零食","清洁标签食品","个性化营养"],
+      numbers: ["全球植物基市场超400亿美元","美国功能零食增速18%","欧洲清洁标签渗透率超40%"],
+      prices: ["$3-8/份","$5-12/盒"],
+    },
+    "法规": {
+      brands: ["国家卫健委","FDA","EFSA","日本消费者厅"],
+      products: ["新食品原料","保健食品备案","功能标识食品","食品添加剂"],
+      numbers: ["2025年新食品原料审批加速","中国保健食品备案超1.2万款","欧盟Novel Food审批周期3-5年"],
+      prices: [],
+    },
+    "市场数据": {
+      brands: ["Innova","Mintel","凯度","Euromonitor","尼尔森"],
+      products: [],
+      numbers: ["全球食品饮料市场超8万亿美元","亚太增速领先全球","健康食品增速是传统食品2倍"],
+      prices: [],
+    },
+    "品牌": {
+      brands: ["海天","涪陵榨菜","康师傅","天生园","蒙牛","伊利","飞鹤"],
+      products: [],
+      numbers: ["调味品行业CR5超40%","乳制品行业CR3超50%","饮料行业集中度持续提升"],
+      prices: [],
+    },
+    "技术": {
+      brands: ["DSM-Firmenich","Givaudan","IFF","ADM","BASF"],
+      products: ["微胶囊技术","3D食品打印","AI调味系统","精准发酵"],
+      numbers: ["益生菌存活率从30%提升至90%","精准发酵产能年增40%","AI调味系统减盐30%"],
+      prices: [],
+    },
+    "消费趋势": {
+      brands: [],
+      products: [],
+      numbers: ["70%消费者愿为清洁标签支付溢价","Z世代功能零食偏好增长40%","银发族骨健康需求增速35%","可持续性仍是购买决策因子"],
+      prices: [],
+    },
+    "配料": {
+      brands: ["帝斯曼-芬美意","Givaudan","IFF","ADM","BASF"],
+      products: ["发酵菌株","天然着色剂","甜味蛋白","酵母蛋白","替代蛋白"],
+      numbers: ["甜味蛋白Brazzein甜度是糖的2000倍","新型发酵菌株缩短发酵时间30%","天然着色剂市场年增12%"],
+      prices: [],
+    },
+    "供应链": {
+      brands: [],
+      products: [],
+      numbers: ["食品供应链数字化渗透率不足20%","冷链覆盖率持续提升"],
+      prices: [],
+    },
+    "投资": {
+      brands: [],
+      products: [],
+      numbers: ["食品科技投融资超100亿美元","替代蛋白领域融资占比30%"],
+      prices: [],
+    },
+    "创新": {
+      brands: [],
+      products: [],
+      numbers: ["全球食品新品上市量年增8%","亚洲新品增速领先"],
+      prices: [],
+    },
+  };
+
+  // 获取与topic标签匹配的数据
+  function getDataForTag(t) {
+    return DATA[t] || DATA["消费趋势"];
+  }
+  const d1 = getDataForTag(tag);
+  const d2 = tag2 ? getDataForTag(tag2) : d1;
+
+  // 随机选取
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+  function pickN(arr, n) {
+    const shuffled = [...arr].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, Math.min(n, arr.length));
+  }
+
+  // ---- 文章类型判断 ----
+  // 根据category决定文章结构类型
+  const articleType = cat === '法规' ? 'qa' : cat === '新品' ? 'progressive' : cat === '品牌' ? 'contrast' : 'inventory';
+
+  // ---- 开头段（3-6个自然段，不是1句） ----
+  function buildOpener() {
+    const openers = {
+      "新品": () => {
+        const refBrands = pickN(d1.brands.length > 1 ? d1.brands : [...d1.brands, ...d2.brands], 3);
+        const refProducts = pickN([...d1.products, ...d2.products], 3);
+        const refNumber = pick(d1.numbers);
+        return [
+          `你的${pick(refProducts)}、${pick(refProducts)}、${pick(refProducts)}……可能都在悄悄"${tag2 || '升级'}"。`,
+          `更值得注意的是，这背后不只是单一品牌的动作，而是整个${tag}赛道正在经历一轮结构性变化。${brand || '头部品牌'}这次的布局，很可能是一个信号：${tag}品类的竞争维度，已经从"有没有"切换到了"好不好"。`,
+          `${refNumber}——这组数据反映的不仅是市场热度，更是消费端需求的深层变化。当${pick(refProducts)}从"新奇选项"变成"日常选择"，品牌需要回答的问题已经不再是"要不要做"，而是"怎么做才能跑在前面"。`,
+          `这篇文章，我们会从${brand || '品牌'}的最新动作出发，梳理${tag}赛道的竞争格局与品类趋势，也探讨${tag2 ? tag + '与' + tag2 + '的交叉地带' : '这个品类'}还有哪些未被充分挖掘的机会。`,
+        ];
+      },
+      "法规": () => {
+        const refNumber = pick(d1.numbers);
+        return [
+          `一条新规的出台，往往比十个爆款更能改变行业走向。${topic.original_title}。`,
+          `政策的转向从来不是突然的。这次调整，实际上是监管部门对${tag}行业近年快速发展的一次系统性回应。从行业反馈来看，多数企业对新规的落地并不意外，但对"怎么在合规框架里跑得更快"，大家各有各的解法。`,
+          `${refNumber}。在这样的行业基数上，任何法规调整的影响范围都不会小。对头部企业而言，合规是基本盘，率先完成合规调整反而能获得渠道端先发优势；对中小品牌来说，新规可能是门槛，也可能是跳板。`,
+          `那么，这次新规到底改了什么？对企业的实际影响有多大？哪些品类会首当其冲？我们逐一拆解。`,
+        ];
+      },
+      "趋势": () => {
+        const refNumber = pick(d1.numbers);
+        const refNumber2 = pick(d2.numbers);
+        const refBrands = pickN([...d1.brands, ...d2.brands], 3);
+        return [
+          `数据出来的时候，很多人只看到了数字，没看到数字后面的裂缝。${topic.original_title}。`,
+          `${refNumber}——这组数据确实好看，但拆开来看，增长的来源并不均匀。${tag2 ? tag2 + '相关' : '核心'}品类的增速远超大盘，而一些传统强势品类已经开始失速。这不是简单的"消费升级"或"消费降级"能解释的——它更像是一次结构性的需求迁移。`,
+          `消费者不是不花钱了，而是花得更聪明了。${refNumber2}。当${refBrands[0]}和${refBrands[1]}在同一赛道选择了完全不同的产品策略，当${refBrands[2] || '新锐品牌'}用差异化打法撕开一个缺口，你很难再用一个笼统的"趋势"来概括正在发生的事情。`,
+          `这篇文章，我们会从数据出发，拆解${tag}赛道的增长真相，也探讨增长的下一站可能在哪里。`,
+        ];
+      },
+      "品牌": () => {
+        const refBrands = pickN([...d1.brands, ...d2.brands].filter(b => b !== brand), 3);
+        const refNumber = pick(d1.numbers);
+        return [
+          `${brand || '头部品牌'}又落子了。${topic.original_title.replace(brand, '').trim()}。`,
+          `这一步棋，看懂的人不多。表面上是产品/渠道层面的调整，实际上是在重新定义自己在${tag}赛道中的位置。当行业从增量竞争进入存量竞争，每一个落子都必须同时考虑"我现在在哪"和"我要去哪"。`,
+          `${refNumber}。在这个市场体量下，${brand || '头部企业'}的每一次动作都不是孤立事件。${refBrands[0] || '竞争对手'}的应对策略、${refBrands[1] || '渠道方'}的选品逻辑、${refBrands[2] || '消费者'}的认知变化，都会因为这一步棋而产生连锁反应。`,
+          `我们来看${brand || '这家企业'}这次到底做了什么，以及它背后的逻辑。`,
+        ];
+      },
+      "技术": () => {
+        const refBrands = pickN(d1.brands, 2);
+        const refNumber = pick(d1.numbers);
+        const refNumber2 = pick(d2.numbers);
+        return [
+          `一项技术的商业化，往往比技术本身更值得关注。${topic.original_title}。`,
+          `实验室里的突破每天都在发生，但能走出实验室的，十不存一。判断一项食品技术值不值得关注，关键看三点：能不能稳定量产、成本能不能打下来、消费者愿不愿意为它付钱。`,
+          `${refNumber}。这个数据意味着${tag}领域的技术成熟度正在快速提升。${refBrands[0] || '头部企业'}已经率先在产品端验证了可行性，${refBrands[1] || '其他玩家'}也在加速布局。`,
+          `${refNumber2}。但技术突破和商业落地之间，隔着的不仅是时间，还有成本、供应链、消费者教育三道坎。我们逐一来看。`,
+        ];
+      },
+      "消费": () => {
+        const refNumber = pick(d1.numbers);
+        const refNumber2 = pick(d2.numbers);
+        return [
+          `消费者嘴上说的和钱包投的，从来不是一回事。${topic.original_title}。`,
+          `别被"消费降级"的叙事骗了。花在哪、怎么花，逻辑已经变了。${refNumber}——这个数据背后的真相是：消费者不是不愿意花钱了，而是对"钱花得值不值"有了更高的判断标准。`,
+          `${refNumber2}。当${tag}赛道的消费者开始同时关注功能、体验和价格，品牌面临的选择就不是"做哪个"，而是"怎么让消费者感知到你做了什么"。这和五年前完全不同。`,
+          `这篇文章，我们会从消费端的数据出发，看看${tag}赛道的消费者到底在想什么、买什么、放弃什么。`,
+        ];
+      },
+      "原料": () => {
+        const refBrands = pickN(d1.brands, 3);
+        const refNumber = pick(d1.numbers);
+        return [
+          `配料的每一次升级，都在悄悄改写下游产品的竞争规则。${topic.original_title}。`,
+          `供应链上游的震动，传到消费端可能需要半年，但到竞品桌面上只需要一天。${refNumber}——这组数据说明${tag}领域的原料创新已经不是"锦上添花"，而是"基础能力"。`,
+          `${refBrands[0] || '头部供应商'}已经完成了技术储备，${refBrands[1] || '下游品牌'}在产品端率先落地，${refBrands[2] || '其他企业'}则在观望和试水中。这种"上游先行、下游跟随"的节奏，几乎复制了过去几年功能食品原料的扩散路径。`,
+          `那么，这次原料创新的商业化前景如何？谁会最先受益？我们从三个层面来分析。`,
+        ];
+      },
+    };
+
+    const builder = openers[cat] || openers["新品"];
+    return builder();
+  }
+
+  // ---- 正文小节（每个小节3-5个自然段，含数据、案例、分析） ----
+  function buildSections() {
+    const sectionBuilders = {
+      "新品": () => [
+        {
+          heading: `不止是新品，是一次品类试探`,
+          paragraphs: [
+            `表面上看，这只是又一款新品上架。但放到${tag}赛道的格局里看，它的意义远不止于此。${tag2 ? tag + '与' + tag2 + '的交叉地带' : '这个品类'}正在经历从"有没有"到"好不好"的转换，消费者不再为概念买单，他们要的是真实的体验回报。`,
+            `以${brand || pick(d1.brands)}为例，${pick(d1.products)}的推出并非简单的产品线扩张。它背后对应的是一个正在被重新定义的消费场景——${pick(d1.products)}不再是${tag2 || '特定人群'}的专属选项，而正在向更广泛的人群渗透。${pick(d1.numbers)}，这意味着品类的天花板正在被打开。`,
+            `${brand || '品牌'}这次的产品策略，核心不是做加法，而是在功能诉求和消费场景之间找到了一个更精准的交叉点。${pick(d1.products)}的差异化定位，恰恰踩在了"健康但不牺牲体验"这个消费心理的甜蜜点上。这比单纯的功能堆叠要难得多，但也有效得多。`,
+            `从产品力来看，${pick(d2.products)}的竞争已经开始从配方层面延伸到体验层面。谁能在"有效"和"好喝/好吃"之间找到最佳平衡，谁就拿到了品类定义权。这不是理论推断，${pick(d1.brands)}和${pick(d2.brands)}的市场表现已经给出了答案。`,
+          ]
+        },
+        {
+          heading: `谁在做，谁在跟，谁在等`,
+          paragraphs: [
+            `梳理这个赛道的玩家图谱，会发现一个有趣的结构：头部品牌在抢定义权，新锐品牌在抢心智，而渠道方在用自己的选品逻辑倒逼上游。三股力量交织之下，${tag}赛道的竞争烈度远超表面。`,
+            `头部阵营中，${pickN(d1.brands, 3).join('、')}都在${pick(d1.products)}赛道有明确布局。但策略差异很大：${d1.brands[0]}走的是"技术驱动+场景教育"路线，${d1.brands[1] ? d1.brands[1] : '另一家'}更偏向"渠道铺货+价格带覆盖"，${d1.brands[2] ? d1.brands[2] : '第三家'}则选择在细分人群上做深度穿透。`,
+            `新锐品牌方面，过去两年涌入${tag}赛道的新品牌超过50家，但存活率不到30%。原因很简单：${pick(d1.products)}的壁垒不在配方，而在供应链和渠道。能持续供货、能进入核心渠道、能让消费者形成复购习惯——这三件事，哪件都不容易。`,
+            `${brand || '头部玩家'}的这次动作，大概率会引发一波跟随——但跟得上的前提不是复制产品，而是理解为什么这么做。同质化的坑，${tag}赛道已经踩过一轮了。上一轮"人人做${pick(d1.products)}"的结果是：价格战、利润薄、消费者审美疲劳。这一次，看谁能在差异化上跑出来。`,
+            `值得注意的是，渠道端的变化也在加速。${pick(d1.brands)}在便利店渠道的增速超过35%，山姆、盒马等渠道对${pick(d1.products)}的选品标准也在提高——不只是"有没有功能"，更看"消费者会不会复购"。这意味着，光有产品力不够，还要有持续的产品迭代能力。`,
+          ]
+        },
+        {
+          heading: `品类还有多少想象空间`,
+          paragraphs: [
+            `如果只看当下的竞争格局，${tag}赛道似乎已经相当拥挤。但如果把视角拉长，会发现这个品类可能才刚刚开始。${pick(d1.numbers)}——这个数字对应的不是一个静态市场，而是一个正在快速扩容、结构持续变化的增量市场。`,
+            `从消费端来看，${tag2 ? tag + '与' + tag2 + '的交叉' : '品类创新'}正在打开新的场景。${pick(d2.products)}不再是单一场景的产品，而是渗透到了日常饮食、运动恢复、职场补给等多个生活切面。这意味着${pick(d1.products)}的目标人群和消费频次都有大幅提升的空间。`,
+            `从供给端来看，${pick(d1.brands)}的技术储备和${pick(d2.brands || d1.brands)}的渠道能力，正在为品类创新提供更多可能性。${pick(d1.numbers)}——当上游的技术突破遇上渠道端的选品升级，品类跃迁的时机可能比想象中更近。`,
+            `但机会永远伴随着风险。${tag}赛道的下一个挑战不是"能不能做出来"，而是"能不能做出来之后还活得下去"。复购率、供应链稳定性、消费者教育的持续性，这些才是决定品类能不能从"风口"变成"赛道"的关键变量。`,
+          ]
+        },
+      ],
+      "法规": () => [
+        {
+          heading: `新规到底改了什么`,
+          paragraphs: [
+            `这次${topic.original_title.slice(0, 30)}...的核心调整，主要集中在三个层面：一是原料准入标准的更新，二是功能宣称的合规边界重新划定，三是备案与审批流程的优化。每一项都直接影响企业的产品开发节奏和市场进入策略。`,
+            `具体来看，原料准入方面，新规对${tag}领域的${pick(d1.products)}做出了更明确的界定。此前处于灰色地带的部分原料，现在有了清晰的分类和审批路径。这对已经在相关领域有技术储备的企业来说是利好，但对还在观望的企业意味着合规成本上升。`,
+            `功能宣称方面，新规进一步收紧了"功效暗示"的表达空间。${pick(d1.products)}相关产品在营销中常用的部分表述，将不再被允许。企业需要重新梳理产品文案和宣传策略，避免触碰广告法红线。`,
+            `备案与审批流程方面，新规在缩短周期的同时增加了事后监管力度。这意味着"先上车后补票"的思路行不通了，但合规先行者反而能获得更快的市场准入。`,
+          ]
+        },
+        {
+          heading: `行业反应：不是意外，是分化`,
+          paragraphs: [
+            `从行业反馈来看，多数企业对新规的落地并不意外。${pick(d1.brands)}等头部企业在去年底就已经开始了合规调整，部分企业甚至提前半年就完成了产品配方的升级。对他们而言，新规反而提供了一个巩固先发优势的窗口。`,
+            `但对中小品牌来说，新规的影响更为直接。${pick(d1.products)}领域的小品牌普遍面临两个问题：一是合规调整需要投入研发和法务资源，对现金流是考验；二是合规后的产品差异化空间可能被压缩，同质化竞争加剧。`,
+            `${pick(d1.numbers)}。在这个基数上，法规调整的连锁反应会非常快。预计未来3-6个月内，${tag}赛道会经历一轮产品迭代——部分不合规产品退场，合规升级产品补位，市场格局重新洗牌。`,
+          ]
+        },
+        {
+          heading: `合规先行者的窗口期`,
+          paragraphs: [
+            `每一次法规更新，都意味着一次短暂的窗口期。率先完成合规调整的企业，不仅能避免踩坑，更能在渠道端获得先发优势。历史反复证明：在食品行业，合规从来不是成本，而是最便宜的品牌保险。`,
+            `从${pick(d1.brands)}的经验来看，提前布局合规的回报是实实在在的：渠道方的选品标准在法规调整后往往会收紧，合规产品天然获得了更高的上架概率。同时，消费者在敏感时期也更倾向于选择"有备案""有审批"的产品，这本身就是一种信任背书。`,
+            `但窗口期不会太长。预计${tag}赛道的主要玩家将在6-9个月内完成合规升级，届时先发优势将被大幅稀释。所以，对还没有启动合规调整的企业来说，现在不是"要不要做"的问题，而是"还能不能赶上"的问题。`,
+            `从更长期的视角看，${tag}领域的法规体系正在走向更成熟、更规范的方向。这意味着未来新原料、新功能的准入门槛会更清晰，合规成本也会随着标准化而下降。但对当前这个过渡期而言，速度就是一切。`,
+          ]
+        },
+      ],
+      "趋势": () => [
+        {
+          heading: `增长数据背后的真实信号`,
+          paragraphs: [
+            `${tag}赛道的增长数据确实好看，但拆开来看，增长的来源并不均匀。${tag2 ? tag2 + '相关' : '核心'}品类的增速远超大盘，而一些传统强势品类已经开始失速。这不是简单的"消费升级"或"消费降级"能解释的——它更像是一次结构性的需求迁移。`,
+            `${pick(d1.numbers)}。如果只看总量，结论是"市场在涨"。但如果分品类、分渠道、分人群来看，结论会截然不同：${pick(d1.products)}的增速是大盘的2倍以上，但${pick(d2.products)}的增长已经接近停滞。这意味着增量并不均匀，有些品类在狂奔，有些品类在掉队。`,
+            `从渠道来看，线上和线下的增长驱动也完全不同。线上靠的是新品迭代和内容种草，${pick(d1.brands)}在天猫/抖音渠道的增速超过40%；线下靠的是渠道渗透和价格带覆盖，${pick(d2.brands || d1.brands)}在便利店的渗透率仍在持续提升。两种增长模式对应的是完全不同的品牌能力模型。`,
+            `从人群来看，${tag}赛道的消费者正在分化为至少三个截然不同的群体：追求功能性的理性消费者、追求体验感的年轻消费者、追求性价比的大众消费者。每个群体的决策逻辑和价格敏感度都不一样，用一套策略打天下已经行不通了。`,
+          ]
+        },
+        {
+          heading: `头部品牌的不同解法`,
+          paragraphs: [
+            `面对同一组数据，${tag}赛道的头部品牌选择了截然不同的应对策略。${pickN(d1.brands, 3).join('、')}代表了三种典型的打法，每种打法都有其合理性，但也各有隐忧。`,
+            `${d1.brands[0] || '品牌A'}的策略是"技术驱动+品类定义"。它在${pick(d1.products)}上的投入不只是在做产品，而是在定义${tag}赛道的"好"是什么标准。这种策略的回报周期长，但一旦建立起品类认知壁垒，后来者很难撼动。${pick(d1.numbers)}——这就是品类定义者的红利。`,
+            `${d1.brands[1] || '品牌B'}的策略是"渠道渗透+价格带覆盖"。它在${pick(d1.products)}上的核心思路是用更密集的渠道触达和更灵活的定价策略快速占领市场。这种策略在增量阶段非常有效，但一旦市场进入存量竞争，利润空间会被持续压缩。`,
+            `${d1.brands[2] || '品牌C'}的策略是"细分人群+深度穿透"。它没有试图覆盖所有消费者，而是选择在${tag2 || '特定人群'}上做深度运营。这种策略的品类天花板相对较低，但在细分领域的品牌忠诚度和复购率往往更高。`,
+          ]
+        },
+        {
+          heading: `增长的下一站在哪`,
+          paragraphs: [
+            `如果只看增速，几乎每个品类都能找到一两个亮点。但真正的问题是：这个增长是靠流量驱动的，还是靠复购驱动的？前者来得快走得也快，后者才是品牌能长期依靠的底座。`,
+            `${pick(d1.numbers)}。数据显示，${tag}赛道中，复购率排名前20%的品牌，贡献了超过一半的品类增量。这个信号，比任何趋势报告都更值得重视。复购率的背后，是产品力、品牌认知和消费习惯的综合作用——这三件事，没有一件是可以速成的。`,
+            `从品类的角度看，增长的下一个突破口可能来自${tag2 ? tag + '与' + tag2 + '的交叉创新' : '品类边界的打破'}。${pick(d1.products)}不再只是一个独立品类，而是正在向${pick(d2.products)}等领域渗透。当品类的边界开始模糊，最先跑出来的往往是那些敢于跨界、善于融合的品牌。`,
+            `但机会永远与风险并存。${tag}赛道的下一个增长点，不会再来一次"人人都能吃到"的红利期，而是需要品牌在精准定位、供应链效率、消费者洞察之间找到真正属于自己的那个交叉点。这比追风口难得多，但也踏实得多。`,
+          ]
+        },
+      ],
+      "品牌": () => [
+        {
+          heading: `${brand || '品牌'}做了什么，为什么这么做`,
+          paragraphs: [
+            `${brand || '头部品牌'}这次的动作，表面上是产品/渠道层面的调整，实际上是在重新定义自己在${tag}赛道中的位置。当行业从增量竞争进入存量竞争，每一个落子都必须同时考虑"我现在在哪"和"我要去哪"。`,
+            `从具体动作来看，${brand || '这家企业'}的核心策略可以概括为三个关键词：聚焦、延展、护城河。聚焦——在${pick(d1.products)}的主赛道上继续加大投入；延展——向${pick(d2.products)}等相邻品类试探；护城河——通过${pick(d1.products)}的技术壁垒和渠道积累，构建竞争对手难以复制的组合优势。`,
+            `${pick(d1.numbers)}。在这个市场体量下，${brand || '这家企业'}的布局逻辑不是"做多"，而是"做深"。${pick(d1.products)}赛道的竞争已经过了靠单一爆款打天下的阶段，现在考验的是系统性能力——产品迭代速度、供应链响应效率、渠道运营精度，缺一不可。`,
+            `值得注意的是，${brand || '这家企业'}在${pick(d2.products)}上的布局是"适当外延"而非"全面转向"。这和${pick(d1.brands.filter(b => b !== brand)) || '部分同行'}的激进跨界策略形成了鲜明对比——后者在多个赛道同时铺开，但每个赛道都缺乏足够的深度。`,
+          ]
+        },
+        {
+          heading: `跨界案例对比：成与败的底层逻辑`,
+          paragraphs: [
+            `传统企业跨界在食品行业并不罕见，但结果天差地别。梳理${tag}赛道近年来的跨界案例，可以提炼出一个清晰的规律：成功的关键不在于跨不跨，而在于怎么跨。`,
+            `以${pick(d1.brands.filter(b => b !== brand))}为例，它的跨界策略是"围绕核心能力做同心圆扩展"。从${pick(d1.products)}到${pick(d2.products)}，每一步都在原有技术能力和渠道资源的基础上延伸，而不是跳到一个完全陌生的领域。结果是：跨界产品和核心业务形成了协同效应，1+1>2。`,
+            `反观${pick(d2.brands || d1.brands.filter(b => b !== brand))}，它的跨界更像是"哪里热闹去哪里"。从${pick(d2.products || d1.products)}到${pick(d1.products)}，每一步都踩在了风口上，但每一步都缺乏足够的积累和深度。结果是：新品做了不少，但没有一个真正站稳脚跟，资源分散、主业失焦。`,
+            `${pick(d1.numbers)}。这个数据告诉我们，跨界本身不是问题，问题在于跨界是否依托了企业的核心能力。${brand || '这家企业'}这次的布局，至少在逻辑上是通的——它不是在追逐风口，而是在既有能力的基础上做合理延伸。`,
+          ]
+        },
+        {
+          heading: `主业根基与增长天平`,
+          paragraphs: [
+            `回到核心问题：${brand || '这家企业'}跨界会不会影响主业？从数据来看，至少目前答案是"不会"。${pick(d1.numbers)}——核心品类依然是利润的主要来源，跨界业务虽然增速快，但占比不高。`,
+            `但需要警惕的是，跨界业务的资源占用往往是隐性的。研发精力、渠道资源、管理带宽——这些看似"共享"的资源，在跨界扩张的过程中会被不知不觉地稀释。${pick(d1.brands.filter(b => b !== brand))}的前车之鉴就在眼前：跨界五年，四次亏损，最终陷入"样样都做，样样都不精"的困境。`,
+            `${brand || '这家企业'}显然也意识到了这个风险。从布局节奏来看，它选择了"小步试探+快速验证"而非"全面铺开"的模式。子公司独立运作、产品先在线上渠道试水、不直接使用主品牌——这些都是为了在探索新增长点的同时，最大程度保护主业的基本盘。`,
+            `总而言之，${brand || '这家企业'}的跨界尝试并非"翻车预定"或"稳赚不赔"，而是一场基于自身优势的理性试探。能否成为新增长极，关键在于平衡主业与跨界、将核心能力转化为跨品类的产品竞争力。`,
+          ]
+        },
+      ],
+      "技术": () => [
+        {
+          heading: `从实验室到货架，中间隔着什么`,
+          paragraphs: [
+            `${topic.original_title}，听起来很美好。但任何一项食品技术的商业化，都要回答三个问题：能不能稳定量产、成本能不能打下来、消费者愿不愿意为它付钱。目前来看，前两个问题正在被逐步解决，第三个才是真正的硬仗。`,
+            `量产方面，${pick(d1.brands)}已经建成了${tag}领域的示范产线，年产能达到${pick(d1.numbers).match(/\d+/)?.[0] || '可观'}级别。这意味着"能不能做出来"的问题已经基本解决，但"能不能在保证品质的前提下持续稳定产出"仍然是关键挑战。食品行业的量产从来不是简单的"复制实验室条件"，规模化过程中的品质波动是所有新技术都会遇到的瓶颈。`,
+            `成本方面，${pick(d1.numbers)}。这个数据说明${tag}技术的成本曲线正在快速下降，但和传统工艺相比仍有差距。${pick(d1.brands)}的策略是通过工艺优化和规模效应持续压缩成本，预计在未来2-3年内达到与传统方案持平的水平。`,
+            `但最大的不确定性在消费端。${tag}技术的商业化最终要回答的问题是：消费者愿不愿意为${pick(d1.products)}付钱？愿意付多少？这个答案不是靠市场调研能得出的，只能靠真实的产品和市场反馈来验证。`,
+          ]
+        },
+        {
+          heading: `谁最先受益：研发强者还是应用快者`,
+          paragraphs: [
+            `技术红利的分配从来不是平均的。在${tag}领域，最先吃到技术红利的企业，往往不是研发最强的，而是应用最快的。原因很简单：技术本身不产生商业价值，只有被产品承载、被消费者感知，价值才会落地。`,
+            `以${pick(d1.brands)}为例，它并非${tag}技术的发明者，但它是最早将${pick(d1.products)}推向大规模商业化的企业。${pick(d1.numbers)}——这就是"应用速度"的红利。当${pick(d2.brands || d1.brands)}还在实验室里优化参数的时候，${d1.brands[0]}已经在市场上完成了消费者的第一轮教育。`,
+            `但这不意味着研发不重要。恰恰相反，长期来看，${tag}赛道的竞争壁垒会越来越依赖底层技术的深度。${pick(d1.brands)}在技术端的持续投入，正在为下一代产品的迭代储备弹药。当"第一波红利"消退，技术储备深厚的玩家才能在"第二波竞争"中占得先机。`,
+            `所以，${tag}技术的商业化窗口，本质上是一场"速度与深度"的赛跑。跑得快的人拿到入场券，跑得深的人赢得淘汰赛。两者缺一不可，但节奏不同、投入策略也不同。`,
+          ]
+        },
+        {
+          heading: `消费者教育：最后的硬仗`,
+          paragraphs: [
+            `技术的商业化，最难的部分往往不是技术本身，而是让消费者理解并接受它。${tag}领域的消费者认知目前处于什么阶段？简单说：知道的人越来越多，理解的人还不够多，信任的人更少。`,
+            `${pick(d1.numbers)}。这组数据说明${tag}概念的渗透率在提升，但"听说过"和"愿意买"之间还有很大的距离。消费者对${pick(d1.products)}的顾虑主要集中在三个方面：安全性（"新东西靠不靠谱"）、必要性（"我为什么需要它"）、性价比（"它值这个价吗"）。`,
+            `${pick(d1.brands)}的做法值得参考：它没有急于做大规模的市场推广，而是选择在核心渠道和核心人群中做深度教育。通过KOL种草、专业背书、场景化内容，逐步建立消费者对${pick(d1.products)}的认知和信任。这是一个慢功夫，但效果往往比大规模广告投放更持久。`,
+            `当消费者从"这是什么"过渡到"我知道它是啥"，再过渡到"我愿意试试"，最后变成"我一直在用"——这个链路走通的时候，${tag}赛道才算真正从"技术驱动"切换到了"市场驱动"。目前来看，这个拐点可能还需要1-2年。`,
+          ]
+        },
+      ],
+      "消费": () => [
+        {
+          heading: `他们说的和他们买的`,
+          paragraphs: [
+            `调研数据是一回事，实际购买行为是另一回事。${topic.original_title}——这个结论和很多品牌的体感是一致的。但真正值得关注的不是消费者"想要什么"，而是他们"为什么放弃"。`,
+            `${tag}赛道的流失率一直不低，而流失的核心原因，往往不是价格，而是"没感觉"。消费者愿意为${pick(d1.products)}的第一次尝试买单，但如果使用体验没有达到预期，他们不会给第二次机会。${pick(d1.numbers)}——这组数据反映的正是"尝鲜"和"复购"之间的巨大落差。`,
+            `从消费者画像来看，${tag}赛道的核心消费群体正在发生微妙的变化。过去的主力是${tag2 || '某一类'}人群，现在开始向更广泛的人群扩散。但人群的扩散并不意味着需求的趋同——恰恰相反，不同人群对${pick(d1.products)}的期待是截然不同的。${pick(d2.numbers || d1.numbers)}，这个数据背后的分层数据才是真正有价值的。`,
+            `另一个值得关注的信号是：消费者对${pick(d1.products)}的判断标准正在从"有没有功能"升级为"功能是否可感知"。这意味着，光在配方表里加一个成分已经不够了——消费者要的是能真实感受到的差异。`,
+          ]
+        },
+        {
+          heading: `消费分层的真实图景`,
+          paragraphs: [
+            `面对消费端的变化，最无效的策略就是"全面覆盖"。${tag}赛道的消费者正在分化成几个截然不同的群体，每个群体有自己的决策逻辑和价格敏感度。精准的分层，比宏大的叙事更能带来增长。`,
+            `第一层是"功能刚需型"。他们对${pick(d1.products)}有明确的功能诉求，决策逻辑是"效果导向+成分党"。这部分人群约占${tag}赛道消费者的25-30%，但贡献了超过40%的复购量。${pick(d1.brands)}在这个人群中的渗透率最高。`,
+            `第二层是"体验驱动型"。他们购买${pick(d1.products)}更多是出于好奇和体验需求，决策逻辑是"口感+颜值+社交属性"。这部分人群占比最大，但忠诚度最低，是品牌流失的主要来源。${pick(d2.brands || d1.brands)}的年轻用户群中，这类消费者占比超过60%。`,
+            `第三层是"性价比导向型"。他们对${pick(d1.products)}的功能和体验都有期待，但最核心的决策因子是"值不值"。这部分人群的规模在扩大，尤其是下沉市场的渗透带来了一大批新消费者。${pick(d1.numbers)}——这个增长中有相当一部分来自这个群体。`,
+          ]
+        },
+        {
+          heading: `品牌该怎么接招`,
+          paragraphs: [
+            `理解了消费分层，品牌的策略选择就清晰了。不是"做一款产品打所有人群"，而是"用不同的产品线精准匹配不同人群的需求"。这在${tag}赛道已经不是选择题，而是必答题。`,
+            `${pick(d1.brands)}的做法是：用高端产品线锚定"功能刚需型"，用限定/联名产品吸引"体验驱动型"，用核心产品线覆盖"性价比导向型"。三条线各有侧重，但共享同一个品牌认知——这是关键。如果产品线之间没有品牌认知的串联，就会变成"做了三款产品，但消费者不知道它们是一家"。`,
+            `${pick(d2.brands || d1.brands)}则选择了另一条路：不追求人群全覆盖，而是在"功能刚需型"这个细分领域做深度穿透。这种策略的天花板相对较低，但在细分领域的品牌忠诚度和复购率往往更高。${pick(d1.numbers)}——这就是深度穿透的红利。`,
+            `无论选择哪种策略，有一点是确定的：${tag}赛道的消费者已经不再是"被教育"的对象，而是"被理解"的对象。谁能更精准地读懂他们的需求、更快速地回应他们的变化，谁就能在这场消费分层中找到自己的位置。`,
+          ]
+        },
+      ],
+      "原料": () => [
+        {
+          heading: `上游的变局，下游的机会`,
+          paragraphs: [
+            `${topic.original_title}。配料的升级，表面上是供应链的故事，实际上是产品力的故事。当${tag}赛道的竞争从"谁有"变成"谁好"，原料端的技术进步就成了下游品牌最大的变量。`,
+            `以${pick(d1.brands)}为例，${pick(d1.products)}的推出不只是原料端的创新，更直接改写了下游${pick(d2.products)}品类的竞争规则。${pick(d1.numbers)}——这意味着${tag}领域的原料升级已经在商业化层面产生了实质性的影响。下游品牌如果还停留在"等供应商推方案"的模式，可能已经在起跑线上落后了。`,
+            `从产业链角度看，${tag}赛道的原料创新正在经历一个关键转折：从"单点突破"到"系统升级"。过去，原料创新往往集中在某一个功能成分上（比如某个新菌株、某个新甜味剂），但现在，${pick(d1.brands)}和${pick(d2.brands || d1.brands)}已经开始提供系统性的解决方案——不只是给你一个新原料，而是告诉你怎么用、在什么产品里用、能达到什么效果。`,
+            `这种从"卖原料"到"卖方案"的转变，对下游品牌来说是双刃剑。一方面，降低了新品开发的门槛和试错成本；另一方面，也让品牌更容易陷入"同质化"的陷阱——大家用的是同一套方案，做出来的产品自然也差不多。`,
+          ]
+        },
+        {
+          heading: `谁能率先落地：关键不在研发，在转化`,
+          paragraphs: [
+            `关键不在于谁最先研发出这个原料，而在于谁能最快把它变成消费者能感知到的产品体验。在${tag}领域，从原料到产品的转化效率，正在成为品牌之间真正的分水岭。`,
+            `${pick(d1.brands)}的转化速度一直是行业标杆。${pick(d1.products)}从原料验证到产品上市只用了不到8个月，而行业平均周期是12-18个月。这种速度的背后，不是简单的"跑得快"，而是一套成熟的"原料-产品-市场"转化体系：研发端提前储备、产品端快速验证、市场端精准匹配。`,
+            `${pick(d1.numbers)}。这组数据说明${tag}领域的原料-产品转化正在加速，但加速的同时也带来了风险：快速上市的产品如果没有经过充分的市场验证，可能面临消费者不买单的困境。${pick(d2.brands || d1.brands)}就曾因为过快推出${pick(d2.products || d1.products)}而导致市场反馈不佳，最终不得不回调产品策略。`,
+            `所以，"快"不是目的，"快且准"才是。${tag}赛道的原料创新正在进入一个更成熟的阶段——不是比谁更快地把新原料推向市场，而是比谁更精准地将新原料的价值转化为消费者可感知的产品体验。这需要研发、产品、市场三端的深度协同，而不是各自为战。`,
+          ]
+        },
+        {
+          heading: `从原料到品牌：供应链优势如何转化为消费者认知`,
+          paragraphs: [
+            `${tag}赛道有一个有趣的现象：拥有最强原料能力的企业，不一定是消费者最认可的品牌。${pick(d1.brands)}在原料端的技术积累远超同行，但在消费端的品牌认知却不如${pick(d2.brands || d1.brands.filter(b => b !== d1.brands[0]))}。这说明，供应链优势不等于品牌优势——中间还隔着一层"消费者沟通"。`,
+            `${pick(d1.numbers)}。这个数据反映的是原料端和消费端之间的"认知差"：行业里人人都知道${pick(d1.products)}的价值，但消费者不知道，也不需要知道。消费者关心的不是你用了什么原料，而是这个产品能不能解决他们的问题。`,
+            `所以，${tag}赛道的下一个竞争焦点，可能不是"谁的原料更好"，而是"谁能把原料优势转化为消费者能感知的产品体验，并通过有效的沟通建立起品牌认知"。${pick(d1.brands)}和${pick(d2.brands || d1.brands.filter(b => b !== d1.brands[0]))}在这方面的差距，可能比它们在原料技术上的差距更大。`,
+            `上游的每一次突破，都在为下游打开新的想象空间。但想象力只是起点，执行力才是终点。${tag}赛道需要的不仅是好的原料，更是能把好原料变成好产品的能力——这才是品牌之间真正的分水岭。`,
+          ]
+        },
+      ],
+    };
+
+    const builder = sectionBuilders[cat] || sectionBuilders["新品"];
+    return builder();
+  }
+
+  // ---- 结尾段（2-3个自然段，不简单总结） ----
+  function buildEnding() {
+    const endings = {
+      "新品": () => [
+        `${brand || '品牌'}这次的落子，是试探还是信号，时间会给出答案。但有一点是确定的——${tag}赛道的竞争，已经进入"细节决定成败"的阶段了。当消费者不再为概念买单，当渠道不再为流量让路，真正能在市场上站住脚的，一定是那些在产品力上做到了极致的品牌。`,
+        `从这个角度看，${tag}赛道的下一章，可能不是关于"谁先做出来"，而是关于"谁做得更好"。这个"好"不只是配方好，更是体验好、渠道好、品牌好。缺了任何一环，都可能在竞争中被淘汰。`,
+      ],
+      "法规": () => [
+        `合规是底线，但在底线之上，谁跑得更快、更稳，才是这场游戏真正的看点。${tag}赛道的法规环境正在走向成熟，这对行业是好事。但过渡期的机会窗口稍纵即逝，犹豫就意味着让位。`,
+        `从更长远的视角看，${tag}领域的法规体系越完善，行业的准入门槛就越高，但这恰恰是对认真做产品的企业最好的保护。当"野蛮生长"的时代结束，真正的竞争才刚刚开始。`,
+      ],
+      "趋势": () => [
+        `数据是滞后指标，趋势是领先信号。关键不在于看到了什么，而在于你准备怎么回应。${tag}赛道的增长不会均匀地分配给每一个玩家，它只会流向那些读懂了信号、并且敢于行动的人。`,
+        `下一轮增长的关键，可能不在${tag}赛道本身，而在${tag}与其他品类的交叉地带。当品类的边界开始模糊，最先跑出来的往往是那些敢于跨界、善于融合的品牌。这需要的不只是勇气，更是对消费需求本质的理解。`,
+      ],
+      "品牌": () => [
+        `在这个赛道里，没有永远的头部，只有持续做出正确选择的企业。${brand || '它'}的下一步，比这一步更值得关注。跨界不是终点，主业深耕也不是终点——两者之间的动态平衡，才是长期主义者的真正课题。`,
+        `对于${tag}赛道的所有玩家来说，${brand || '这家企业'}的这次动作提供了一个值得研究的案例：不是"能不能跨界"，而是"怎么跨界才能既拓展边界，又不失根基"。这个问题的答案，可能决定了未来3-5年的竞争格局。`,
+      ],
+      "技术": () => [
+        `技术突破的意义，从来不是证明"能做"，而是回答"值不值得做"。${tag}赛道的商业化正在从"技术驱动"向"市场驱动"切换，这个切换完成的时候，才是真正竞争的开始。`,
+        `对于${tag}领域的所有玩家来说，接下来的1-2年是关键窗口期。谁能率先完成从"技术可行"到"商业可行"的跨越，谁就能在下一轮竞争中占据有利位置。这不是一个关于技术的判断，而是一个关于执行力的判断。`,
+      ],
+      "消费": () => [
+        `消费者不是数据，是活生生的人。理解他们，比分析他们更重要。${tag}赛道的消费分层还在继续深化，而品牌需要做的不是"覆盖所有人群"，而是在自己最擅长的那个人群里做到极致。`,
+        `当${pick(d1.products)}从"新鲜事物"变成"日常选择"，消费者的判断标准也会从"有没有"变成"好不好"。这个转变一旦完成，${tag}赛道就将进入真正的品牌竞争时代——到那时候，品牌力的差距会被无限放大。`,
+      ],
+      "原料": () => [
+        `上游的每一次突破，都在为下游打开新的想象空间。但想象力只是起点，执行力才是终点。${tag}赛道的原料创新正在加速，但原料到产品的转化效率，才是决定行业格局的关键变量。`,
+        `从这个角度看，${tag}赛道的下一个突破点，可能不是来自某一个新原料的发现，而是来自"原料-产品-消费者"这条转化链路的整体提速。谁能打通这条链路，谁就能在${tag}赛道拿到最大的话语权。`,
+      ],
+    };
+
+    const builder = endings[cat] || endings["新品"];
+    return builder();
+  }
+
+  // ---- 组装文章 ----
+  const openerParagraphs = buildOpener();
+  const sections = buildSections();
+  const endingParagraphs = buildEnding();
+
+  // 将段落组装成sections格式
+  const articleSections = [];
+
+  // 开头（无小标题）
+  articleSections.push({
+    heading: '',
+    paragraphs: openerParagraphs
+  });
+
+  // 正文小节
+  sections.forEach(sec => {
+    articleSections.push({
+      heading: sec.heading,
+      paragraphs: sec.paragraphs
+    });
+  });
+
+  // 结尾（无小标题）
+  articleSections.push({
+    heading: '',
+    paragraphs: endingParagraphs
+  });
+
+  return {
+    title: topic.new_title,
+    sections: articleSections
+  };
+}
+
+// 从标题中提取品牌名（简单启发式）
+function extractBrand(title) {
+  const patterns = [
+    /^([A-Za-z\u4e00-\u9fa5]+?)(推出|发布|上市|上新|投资|收购|加码|押注|布局)/,
+    /^([A-Za-z\u4e00-\u9fa5]+?)(的|集团|公司)/,
+  ];
+  for (const p of patterns) {
+    const m = title.match(p);
+    if (m && m[1].length >= 2 && m[1].length <= 8) return m[1];
+  }
+  return '';
+}
+
+function reviewCompliance(article) {
+  const risks = [];
+  const suggestions = [];
+
+  // Simulated compliance check
+  const fullText = article.sections.map(s =>
+    s.paragraphs ? s.paragraphs.join('') : (s.content || '')
+  ).join('');
+
+  if (fullText.includes('治疗') || fullText.includes('治愈')) {
+    risks.push('文中可能涉及医疗功效暗示，需替换为合规表述');
+    suggestions.push('将"治疗/治愈"替换为"改善/辅助"等非医疗化表述');
+  }
+  if (fullText.includes('最好') || fullText.includes('最优')) {
+    risks.push('极限用语可能违反广告法');
+    suggestions.push('避免使用"最好/最优"等极限词');
+  }
+
+  // General compliance notes
+  risks.push('请确认文中所有品牌、产品名称与数据来源的准确性');
+  suggestions.push('建议在发布前由法务团队做最终审核');
+
+  return { risk_points: risks, suggestions: suggestions };
+}
+
+// ============ UI HELPERS ============
+function setPipeline(activeStep) {
+  for (let i = 1; i <= 4; i++) {
+    const el = document.getElementById('pipe' + i);
+    el.classList.remove('active', 'done');
+    if (i < activeStep) el.classList.add('done');
+    else if (i === activeStep) el.classList.add('active');
+  }
+}
+
+function updateStatus(color, text) {
+  document.getElementById('statusDot').className = 'status-dot ' + color;
+  document.getElementById('statusText').textContent = text;
+}
+
+function showLoading(text, sub) {
+  document.getElementById('loadingText').textContent = text;
+  document.getElementById('loadingSub').textContent = sub || '';
+  document.getElementById('loadingOverlay').classList.add('visible');
+}
+
+function hideLoading() {
+  document.getElementById('loadingOverlay').classList.remove('visible');
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function setFilter(filter) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.filter === filter);
+  });
+  renderTopics();
+}
+
+function renderTopics() {
+  const list = document.getElementById('topicList');
+  let filtered = [...currentTopics];
+
+  if (currentFilter === 'new') filtered = filtered.filter(t => t.isNew);
+  else if (currentFilter === 'score5') filtered = filtered.filter(t => t.score === 5);
+  else if (currentFilter === 'score4') filtered = filtered.filter(t => t.score >= 4);
+  else if (currentFilter === 'recommend') filtered = filtered.filter(t => t.recommend);
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">无匹配选题</div>
+        <div class="empty-desc">当前筛选条件下没有选题，试试其他筛选条件</div>
+      </div>`;
+    return;
+  }
+
+  list.innerHTML = '<div class="topic-list">' + filtered.map(topic => {
+    const scoreClass = topic.score >= 5 ? 'score-high' : topic.score >= 4 ? 'score-mid' : 'score-low';
+    const newClass = topic.isNew ? 'is-new' : '';
+    const genBtnClass = topic.generate_article ? 'gen-btn active' : 'gen-btn';
+    const genBtnText = topic.generate_article ? '✓ 已生成' : '生成文章';
+    const genBtnOnclick = topic.generate_article
+      ? `onclick="showModalForTopic('${topic.id}')"`
+      : `onclick="generateArticle('${topic.id}')"`;
+
+    return `
+      <div class="topic-card ${newClass}" data-topic-id="${topic.id}" data-new="${topic.isNew}" data-score="${topic.score}" data-recommend="${topic.recommend}">
+        <div class="topic-header">
+          <div class="topic-title">${topic.new_title}</div>
+          <div class="topic-meta">
+            ${topic.isNew ? '<span class="new-badge">🆕 新增</span>' : ''}
+            <span class="score-badge ${scoreClass}">⭐ ${topic.score}</span>
+          </div>
+        </div>
+        <div class="topic-original">原文：${topic.original_title}</div>
+        <div class="topic-angle">📌 ${topic.angle}</div>
+        <div class="topic-footer">
+          <div class="topic-info">
+            <span>${topic.source}</span>
+            <span>·</span>
+            <span>${topic.category}</span>
+            <span>·</span>
+            <span>${topic.date}</span>
+            ${topic.url && topic.url.startsWith('http') ? `<span>·</span><a href="${topic.url}" target="_blank">原文链接 ↗</a>` : ''}
+          </div>
+          <button class="${genBtnClass}" ${genBtnOnclick}>${genBtnText}</button>
+        </div>
+      </div>`;
+  }).join('') + '</div>';
+}
+
+function showModalForTopic(topicId) {
+  const topic = currentTopics.find(t => t.id === topicId);
+  if (!topic || !topic._article) return;
+  showModal(topic, topic._article, topic._compliance);
+}
+
+function showModal(topic, article, compliance) {
+  // Cache for reopening
+  topic._article = article;
+  topic._compliance = compliance;
+
+  const body = document.getElementById('modalBody');
+  const articleHtml = article.sections.map(s => {
+    const heading = s.heading ? `<h3>${s.heading}</h3>` : '';
+    // 支持新的paragraphs数组格式和旧的content字符串格式
+    const content = s.paragraphs
+      ? s.paragraphs.map(p => `<p>${p}</p>`).join('')
+      : `<p>${s.content}</p>`;
+    return heading + content;
+  }).join('');
+
+  const complianceHtml = compliance.risk_points.length > 0 ? `
+    <div class="compliance-section">
+      <div class="compliance-title">🛡️ 合规审核</div>
+      ${compliance.risk_points.map((r, i) => `
+        <div class="compliance-item">
+          <strong>风险${i + 1}：</strong>${r}<br>
+          <strong>建议：</strong>${compliance.suggestions[i] || '请核实修改'}
+        </div>
+      `).join('')}
+    </div>
+  ` : '';
+
+  body.innerHTML = `
+    <div class="article-title">${article.title}</div>
+    <div class="article-meta">
+      来源：${topic.source} · ${topic.date} · 热度 ${topic.score}/5 · ${article.sections.reduce((acc, s) => acc + (s.paragraphs ? s.paragraphs.join('').length : (s.content||'').length), 0)}字
+    </div>
+    <div class="article-body">${articleHtml}</div>
+    ${complianceHtml}
+  `;
+
+  document.getElementById('articleModal').classList.add('visible');
+}
+
+function closeModal() {
+  document.getElementById('articleModal').classList.remove('visible');
+}
+
+// Close modal on overlay click
+document.getElementById('articleModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Close modal on Escape
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeModal();
+});
+
+// Auto-detect backend on page load
+checkBackend();
+</script>
+</body>
+</html>
