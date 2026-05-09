@@ -902,6 +902,94 @@ def scrape_rss(feed_url, source_name, category, region):
 
 
 # ============================================================
+# 通用爬虫（用于用户自定义来源）
+# ============================================================
+
+def scrape_generic(url, source_name, category='行业资讯', region='其他', source_type='auto'):
+    """通用爬虫：自动检测RSS或HTML并抓取"""
+    items = []
+
+    # 先尝试RSS
+    if source_type in ('auto', 'rss'):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            if resp.status_code == 200:
+                content_type = resp.headers.get('Content-Type', '')
+                # 检查是否是RSS/XML
+                if 'xml' in content_type or resp.text.strip().startswith('<?xml') or '<rss' in resp.text[:500] or '<feed' in resp.text[:500]:
+                    items = scrape_rss(url, source_name, category, region)
+                    if items:
+                        logger.info(f"通用爬虫(RSS) {source_name}: 抓取 {len(items)} 条")
+                        return items
+        except:
+            pass
+
+    # HTML爬取
+    if source_type in ('auto', 'html'):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, 'lxml')
+
+            # 尝试多种常见文章选择器
+            selectors = [
+                'article',
+                '[class*="article"]',
+                '[class*="story"]',
+                '[class*="post"]',
+                '[class*="news"]',
+                '[class*="item"]',
+                '[class*="entry"]',
+                '[class*="card"]',
+            ]
+
+            for sel in selectors:
+                articles = soup.select(sel)
+                if len(articles) >= 2:  # 至少找到2篇才算有效
+                    for art in articles[:15]:
+                        title_el = art.select_one('h1 a, h2 a, h3 a, h4 a, a[class*="title"], a[class*="headline"]')
+                        if not title_el:
+                            continue
+
+                        title = title_el.get_text(strip=True)
+                        if not title or len(title) < 6:
+                            continue
+
+                        art_url = title_el.get('href', '')
+                        if art_url and not art_url.startswith('http'):
+                            # 尝试拼接base URL
+                            from urllib.parse import urljoin
+                            art_url = urljoin(url, art_url)
+
+                        date_el = art.select_one('time, [class*="date"], [class*="time"], [datetime]')
+                        date_str = ''
+                        if date_el:
+                            date_str = date_el.get('datetime', '')[:10] or date_el.get_text(strip=True)
+
+                        summary_el = art.select_one('p, [class*="desc"], [class*="summary"], [class*="excerpt"]')
+                        summary = summary_el.get_text(strip=True)[:100] if summary_el else ''
+
+                        items.append({
+                            'title': title,
+                            'date': date_str,
+                            'source': source_name,
+                            'url': art_url,
+                            'summary': summary,
+                            'category': category,
+                            'region': region,
+                        })
+
+                    if items:
+                        break  # 找到有效选择器就停
+
+            logger.info(f"通用爬虫(HTML) {source_name}: 抓取 {len(items)} 条")
+        except Exception as e:
+            logger.error(f"通用爬虫 {source_name} 抓取失败: {e}")
+
+    return items
+
+
+# ============================================================
 # 主抓取入口
 # ============================================================
 
