@@ -5,9 +5,10 @@ Foodaily 内容生产系统 - Flask API 服务器
 """
 
 import os
+import json
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from scraper import run_all_scrapers, SCRAPERS, RSS_FEEDS
+from scraper import run_all_scrapers, scrape_generic, SCRAPERS, RSS_FEEDS
 import threading
 import time
 import logging
@@ -27,6 +28,26 @@ cache = {
     'scraping': False,
     'scrape_progress': '',
 }
+
+# 动态来源：保存到文件，跨重启持久化
+SOURCES_FILE = os.path.join(os.path.dirname(__file__), 'custom_sources.json')
+
+def load_custom_sources():
+    """加载用户自定义来源"""
+    if os.path.exists(SOURCES_FILE):
+        try:
+            with open(SOURCES_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return []
+
+def save_custom_sources(sources):
+    """保存用户自定义来源"""
+    with open(SOURCES_FILE, 'w', encoding='utf-8') as f:
+        json.dump(sources, f, ensure_ascii=False, indent=2)
+
+custom_sources = load_custom_sources()
 
 CACHE_TTL = int(os.environ.get('CACHE_TTL', 1800))  # 默认30分钟，可通过环境变量调整
 
@@ -74,6 +95,20 @@ def scrape():
         cache['scrape_progress'] = '开始抓取...'
         try:
             items = run_all_scrapers(use_rss=True)
+            # 同时抓取用户自定义来源
+            for src in load_custom_sources():
+                try:
+                    cache['scrape_progress'] = f'抓取自定义来源: {src["name"]}...'
+                    custom_items = scrape_generic(src['url'], src['name'], src.get('category', '行业资讯'), src.get('region', '其他'), src.get('type', 'auto'))
+                    items.extend(custom_items)
+                    logger.info(f"自定义来源 {src['name']}: 抓取 {len(custom_items)} 条")
+                except Exception as e:
+                    logger.error(f"自定义来源 {src['name']} 抓取失败: {e}")
+                time.sleep(0.3)
+            # 去重
+            from scraper import deduplicate
+            items = deduplicate(items)
+            items.sort(key=lambda x: x.get('date', ''), reverse=True)
             cache['items'] = items
             cache['last_scrape'] = time.time()
             cache['scrape_progress'] = f'完成，共{len(items)}条'
@@ -152,22 +187,103 @@ def get_news():
 
 @app.route('/api/sources', methods=['GET'])
 def get_sources():
-    """获取所有信息源列表"""
+    """获取所有信息源列表（内置 + 用户自定义）"""
     sources = []
+    # 内置HTML爬虫
     for scraper in SCRAPERS:
         sources.append({
-            'name': scraper.__name__,
+            'id': scraper.__name__,
+            'name': scraper.__name__.replace('scrape_', '').replace('_', ' ').title(),
             'type': 'html',
+            'built_in': True,
         })
+    # 内置RSS
     for feed_url, name, cat, region in RSS_FEEDS:
         sources.append({
+            'id': f'rss_{name}',
             'name': name,
             'url': feed_url,
             'type': 'rss',
             'category': cat,
             'region': region,
+            'built_in': True,
         })
-    return jsonify({'sources': sources})
+    # 用户自定义来源
+    for src in custom_sources:
+        src['built_in'] = False
+        sources.append(src)
+    return jsonify({'sources': sources, 'total': len(sources)})
+
+
+@app.route('/api/sources', methods=['POST'])
+def add_source():
+    """添加自定义信息源"""
+    global custom_sources
+    data = request.get_json()
+    if not data or not data.get('url'):
+        return jsonify({'error': 'URL is required'}), 400
+
+    # 检查URL是否已存在
+    url = data['url'].strip().rstrip('/')
+    for src in custom_sources:
+        if src.get('url', '').rstrip('/') == url:
+            return jsonify({'error': '该来源已存在'}), 409
+
+    new_source = {
+        'id': f'custom_{int(time.time())}',
+        'name': data.get('name', '') or url.split('//')[1].split('/')[0],
+        'url': url,
+        'type': data.get('type', 'auto'),  # auto / html / rss
+        'category': data.get('category', '行业资讯'),
+        'region': data.get('region', '其他'),
+        'built_in': False,
+    }
+
+    custom_sources.append(new_source)
+    save_custom_sources(custom_sources)
+
+    logger.info(f"新增来源: {new_source['name']} ({new_source['url']})")
+    return jsonify({'message': '来源添加成功', 'source': new_source}), 201
+
+
+@app.route('/api/sources/<source_id>', methods=['DELETE'])
+def delete_source(source_id):
+    """删除自定义信息源（只能删用户添加的）"""
+    global custom_sources
+    original_len = len(custom_sources)
+    custom_sources = [s for s in custom_sources if s['id'] != source_id]
+
+    if len(custom_sources) == original_len:
+        return jsonify({'error': '来源不存在或为内置来源，不可删除'}), 404
+
+    save_custom_sources(custom_sources)
+    logger.info(f"删除来源: {source_id}")
+    return jsonify({'message': '来源已删除'})
+
+
+@app.route('/api/sources/test', methods=['POST'])
+def test_source():
+    """测试来源URL是否可访问并抓取"""
+    data = request.get_json()
+    if not data or not data.get('url'):
+        return jsonify({'error': 'URL is required'}), 400
+
+    url = data['url'].strip()
+    source_type = data.get('type', 'auto')
+    source_name = data.get('name', url.split('//')[1].split('/')[0] if '//' in url else url)
+
+    try:
+        items = scrape_generic(url, source_name, data.get('category', '行业资讯'), data.get('region', '其他'), source_type)
+        return jsonify({
+            'accessible': True,
+            'items_count': len(items),
+            'sample': items[:3],
+        })
+    except Exception as e:
+        return jsonify({
+            'accessible': False,
+            'error': str(e),
+        })
 
 
 if __name__ == '__main__':
