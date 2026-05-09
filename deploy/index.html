@@ -650,8 +650,8 @@ body {
 }
 .source-delete:hover { color: var(--score-low); background: rgba(255,71,87,0.1); }
 
-/* Add Source Modal（独立样式，不与文章弹窗冲突） */
-.source-modal-overlay {
+/* Add Source Modal */
+.modal-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.7);
   backdrop-filter: blur(4px);
@@ -660,11 +660,7 @@ body {
   align-items: center;
   justify-content: center;
 }
-.source-modal-overlay.active {
-  display: flex;
-  opacity: 1;
-  pointer-events: all;
-}
+.modal-overlay.active { display: flex; }
 .modal-box {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -858,7 +854,7 @@ body {
   </div>
 
   <!-- Add Source Modal -->
-  <div class="source-modal-overlay" id="addSourceModal">
+  <div class="modal-overlay" id="addSourceModal">
     <div class="modal-box">
       <button class="modal-close" onclick="closeAddSourceModal()">&times;</button>
       <h3>➕ 新增数据来源</h3>
@@ -1429,21 +1425,7 @@ function toggleLogPanel() {
 
 // ============ SOURCES MANAGEMENT ============
 let sourcesLoaded = false;
-const CUSTOM_SOURCES_KEY = 'foodaily_custom_sources';
 
-// 从 localStorage 读取自定义来源
-function getLocalCustomSources() {
-  try {
-    return JSON.parse(localStorage.getItem(CUSTOM_SOURCES_KEY)) || [];
-  } catch { return []; }
-}
-
-// 保存自定义来源到 localStorage
-function saveLocalCustomSources(sources) {
-  localStorage.setItem(CUSTOM_SOURCES_KEY, JSON.stringify(sources));
-}
-
-// 切换来源面板
 function toggleSourcesPanel() {
   const panel = document.getElementById('sourcesPanel');
   panel.classList.toggle('active');
@@ -1452,87 +1434,28 @@ function toggleSourcesPanel() {
   }
 }
 
-// 加载来源：优先后端，失败则用 localStorage + 内置
 async function loadSources() {
   const grid = document.getElementById('sourcesGrid');
   grid.innerHTML = '<div style="color:var(--text-muted);font-size:0.85rem;padding:1rem;">加载中...</div>';
 
-  let allSources = [];
-
-  // 始终加载内置来源（后端不可用时也显示）
-  const builtInSources = getBuiltInSources();
-
-  if (useRealAPI) {
-    try {
-      const resp = await fetch(API_BASE + '/api/sources', { signal: AbortSignal.timeout(5000) });
-      if (resp.ok) {
-        const data = await resp.json();
-        // 后端返回的来源里已经包含内置+自定义
-        allSources = data.sources || [];
-        // 同时同步到 localStorage（自定义部分）
-        const custom = (data.sources || []).filter(s => !s.built_in);
-        saveLocalCustomSources(custom);
-      } else {
-        // 后端返回错误，用 localStorage
-        allSources = builtInSources.concat(getLocalCustomSources());
-      }
-    } catch (e) {
-      // 后端不可用，用 localStorage
-      allSources = builtInSources.concat(getLocalCustomSources());
-    }
-  } else {
-    // 后端不在线，直接用 localStorage
-    allSources = builtInSources.concat(getLocalCustomSources());
-  }
-
-  renderSources(allSources);
-  sourcesLoaded = true;
-}
-
-// 获取内置来源列表（前端硬编码，不依赖后端）
-function getBuiltInSources() {
-  const sources = [];
-  // 从全局 SCRAPERS / RSS_FEEDS 构建（若不存在则用硬编码）
-  // 这里用 SOURCES 变量（如果存在）
-  if (typeof SOURCES !== 'undefined') {
-    SOURCES.forEach(s => {
-      sources.push({
-        id: 'builtin_' + s.name,
-        name: s.name,
-        url: s.url || '',
-        type: s.type || 'html',
-        category: s.category || '行业资讯',
-        region: s.region || '其他',
-        built_in: true,
-      });
-    });
-  }
-  // 内置 RSS 源（硬编码，确保即使后端挂了也能显示）
-  const builtinRSS = [
-    { name: 'Food Dive RSS', url: 'https://www.fooddive.com/feeds/news/', category: '行业资讯', region: '北美' },
-    { name: 'Just Food RSS', url: 'https://www.just-food.com/rss/', category: '行业资讯', region: '欧洲' },
-    { name: 'Food Navigator RSS', url: 'https://www.foodnavigator.com/rss/', category: '行业资讯', region: '欧洲' },
-    { name: 'Bakery and Snacks RSS', url: 'https://www.bakeryandsnacks.com/rss/', category: '行业资讯', region: '欧洲' },
-    { name: 'Dairy Reporter RSS', url: 'https://www.dairyreporter.com/rss/', category: '乳制品', region: '欧洲' },
-    { name: 'Confectionery News RSS', url: 'https://www.confectionerynews.com/rss/', category: '行业资讯', region: '欧洲' },
-    { name: 'Meat Poultry Seafood RSS', url: 'https://www.meatpoultryseafood.com/rss/', category: '行业资讯', region: '北美' },
-    { name: 'Beverage Daily RSS', url: 'https://www.beveragedaily.com/rss/', category: '饮料行业', region: '欧洲' },
-    { name: 'Nutraingredients RSS', url: 'https://www.nutraingredients.com/rss/', category: '营养配料', region: '欧洲' },
-    { name: 'Food Processing RSS', url: 'https://www.foodprocessing.com/rss/', category: '行业技术', region: '北美' },
-    { name: 'Prepared Foods RSS', url: 'https://www.preparedfoods.com/rss/', category: '行业资讯', region: '北美' },
-  ];
-  builtinRSS.forEach(s => {
-    sources.push({
-      id: 'builtin_rss_' + s.name,
+  try {
+    const resp = await fetch(API_BASE + '/api/sources');
+    const data = await resp.json();
+    renderSources(data.sources || []);
+    sourcesLoaded = true;
+  } catch (e) {
+    // 后端不可用，显示本地SOURCES
+    const localSources = SOURCES.map(s => ({
+      id: s.name,
       name: s.name,
       url: s.url,
-      type: 'rss',
-      category: s.category,
-      region: s.region,
+      type: s.type ? 'html' : 'html',
+      category: s.type || '行业资讯',
+      region: s.region || '其他',
       built_in: true,
-    });
-  });
-  return sources;
+    }));
+    renderSources(localSources);
+  }
 }
 
 function renderSources(sources) {
@@ -1542,26 +1465,28 @@ function renderSources(sources) {
     return;
   }
 
+  // 按地区分组
+  const regionOrder = ['北美', '欧洲', '日本', '国内', '其他'];
   const regionEmoji = { '北美': '🇺🇸', '欧洲': '🇪🇺', '日本': '🇯🇵', '国内': '🇨🇳', '东南亚': '🌏', '其他': '🌐' };
-  const typeLabelMap = { 'rss': 'RSS', 'html': 'HTML', 'auto': 'AUTO' };
 
   let html = '';
+  // 内置来源
   const builtIn = sources.filter(s => s.built_in);
   const custom = sources.filter(s => !s.built_in);
 
   if (builtIn.length) {
     html += '<div style="grid-column:1/-1;font-size:0.75rem;color:var(--text-muted);font-weight:600;padding:0.5rem 0;">内置来源 (' + builtIn.length + ')</div>';
     builtIn.forEach(s => {
-      const typeClass = s.type || 'html';
-      const typeLabel = typeLabelMap[s.type] || 'HTML';
-      const emoji = regionEmoji[s.region] || '🌐';
+      const typeClass = (s.type === 'rss') ? 'rss' : 'html';
+      const typeLabel = s.type === 'rss' ? 'RSS' : 'HTML';
+      const emoji = regionEmoji[s.region || s.category] || '🌐';
       html += `
         <div class="source-card">
           <div class="source-icon ${typeClass}">${typeLabel}</div>
           <div class="source-info">
             <div class="source-name">${emoji} ${s.name}</div>
             <div class="source-meta">${s.category || ''} · ${s.region || ''}</div>
-            ${s.url ? `<span class="source-url">${s.url}</span>` : ''}
+            ${s.url && s.url !== '公众号' ? `<span class="source-url">${s.url}</span>` : ''}
           </div>
         </div>`;
     });
@@ -1570,8 +1495,8 @@ function renderSources(sources) {
   if (custom.length) {
     html += '<div style="grid-column:1/-1;font-size:0.75rem;color:var(--accent);font-weight:600;padding:0.5rem 0;margin-top:0.5rem;">自定义来源 (' + custom.length + ')</div>';
     custom.forEach(s => {
-      const typeClass = s.type || 'auto';
-      const typeLabel = typeLabelMap[s.type] || 'AUTO';
+      const typeClass = (s.type === 'rss') ? 'rss' : (s.type === 'html' ? 'html' : 'auto');
+      const typeLabel = s.type === 'rss' ? 'RSS' : (s.type === 'html' ? 'HTML' : 'AUTO');
       const emoji = regionEmoji[s.region] || '🌐';
       html += `
         <div class="source-card custom">
@@ -1589,7 +1514,6 @@ function renderSources(sources) {
   grid.innerHTML = html;
 }
 
-// ============ 新增来源弹窗 ============
 function openAddSourceModal() {
   document.getElementById('addSourceModal').classList.add('active');
   document.getElementById('newSourceUrl').value = '';
@@ -1598,15 +1522,12 @@ function openAddSourceModal() {
   document.getElementById('testResult').className = 'test-result';
   document.getElementById('testResult').textContent = '';
   document.getElementById('addSourceBtn').disabled = false;
-  // 聚焦到URL输入框
-  setTimeout(() => document.getElementById('newSourceUrl').focus(), 100);
 }
 
 function closeAddSourceModal() {
   document.getElementById('addSourceModal').classList.remove('active');
 }
 
-// 测试来源URL（后端可用则调后端，否则前端直接提示）
 async function testNewSource() {
   const url = document.getElementById('newSourceUrl').value.trim();
   const resultEl = document.getElementById('testResult');
@@ -1614,7 +1535,6 @@ async function testNewSource() {
   if (!url) {
     resultEl.className = 'test-result error';
     resultEl.textContent = '请输入 URL';
-    resultEl.style.display = 'block';
     return;
   }
 
@@ -1622,52 +1542,36 @@ async function testNewSource() {
   resultEl.textContent = '测试中...';
   resultEl.style.display = 'block';
 
-  if (useRealAPI) {
-    // 后端在线，用后端测试
-    try {
-      const resp = await fetch(API_BASE + '/api/sources/test', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: url,
-          name: document.getElementById('newSourceName').value.trim(),
-          type: document.getElementById('newSourceType').value,
-          category: document.getElementById('newSourceCategory').value,
-          region: document.getElementById('newSourceRegion').value,
-        }),
-      });
-      const data = await resp.json();
+  try {
+    const resp = await fetch(API_BASE + '/api/sources/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: url,
+        name: document.getElementById('newSourceName').value.trim(),
+        type: document.getElementById('newSourceType').value,
+        category: document.getElementById('newSourceCategory').value,
+        region: document.getElementById('newSourceRegion').value,
+      }),
+    });
+    const data = await resp.json();
 
-      if (data.accessible) {
-        resultEl.className = 'test-result success';
-        let msg = `✅ 连接成功！可抓取 ${data.items_count} 条资讯`;
-        if (data.source_name) msg += `\n识别名称：${data.source_name}`;
-        if (data.sample && data.sample.length > 0) {
-          msg += `\n示例：${(data.sample[0].title || '').substring(0, 60)}`;
-        }
-        resultEl.textContent = msg;
-      } else {
-        resultEl.className = 'test-result error';
-        resultEl.textContent = '❌ 无法抓取：' + (data.error || '请检查URL是否正确');
-      }
-    } catch (e) {
-      resultEl.className = 'test-result error';
-      resultEl.textContent = '❌ 测试失败：' + e.message;
-    }
-  } else {
-    // 后端不在线：只做 URL 格式校验，提示用户
-    try {
-      new URL(url);
+    if (data.accessible) {
       resultEl.className = 'test-result success';
-      resultEl.textContent = '✅ URL 格式正确（后端离线，添加后将保存在浏览器本地，刷新选题时生效）';
-    } catch {
+      resultEl.textContent = `✅ 连接成功！可抓取 ${data.items_count} 条资讯`;
+      if (data.sample && data.sample.length > 0) {
+        resultEl.textContent += `\n示例：${data.sample[0].title}`;
+      }
+    } else {
       resultEl.className = 'test-result error';
-      resultEl.textContent = '❌ URL 格式不正确，请检查';
+      resultEl.textContent = '❌ 无法抓取：' + (data.error || '请检查URL是否正确');
     }
+  } catch (e) {
+    resultEl.className = 'test-result error';
+    resultEl.textContent = '❌ 测试失败：' + e.message;
   }
 }
 
-// 添加新来源（双模式：后端在线则同步到后端，否则只存本地）
 async function addNewSource() {
   const url = document.getElementById('newSourceUrl').value.trim();
   const name = document.getElementById('newSourceName').value.trim();
@@ -1678,55 +1582,25 @@ async function addNewSource() {
 
   if (!url) { alert('请输入 URL'); return; }
 
-  // URL 格式校验
-  try { new URL(url); } catch {
-    alert('URL 格式不正确，请以 http:// 或 https:// 开头');
-    return;
-  }
-
   btn.disabled = true;
   btn.textContent = '添加中...';
 
-  const newSource = {
-    id: 'local_' + Date.now(),
-    name: name || url.replace(/^https?:\/\//, '').split('/')[0],
-    url: url,
-    type: type,
-    category: category,
-    region: region,
-    built_in: false,
-  };
-
   try {
-    // 后端在线：先尝试推到后端
-    if (useRealAPI) {
-      try {
-        const resp = await fetch(API_BASE + '/api/sources', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url, name, type, category, region }),
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          newSource.id = data.source.id;
-        }
-      } catch (e) { /* 忽略，存本地 */ }
-    }
+    const resp = await fetch(API_BASE + '/api/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, name, type, category, region }),
+    });
+    const data = await resp.json();
 
-    // 存到 localStorage
-    const localSources = getLocalCustomSources();
-    const existIdx = localSources.findIndex(s => s.url === url);
-    if (existIdx >= 0) {
-      localSources[existIdx] = newSource;
+    if (resp.ok) {
+      closeAddSourceModal();
+      sourcesLoaded = false;
+      loadSources();
+      logger('info', '来源已添加', `${data.source.name} (${data.source.url})`);
     } else {
-      localSources.push(newSource);
+      alert(data.error || '添加失败');
     }
-    saveLocalCustomSources(localSources);
-
-    closeAddSourceModal();
-    sourcesLoaded = false;
-    loadSources();
-    logger('info', '来源已添加', `${newSource.name} (${newSource.url})`);
   } catch (e) {
     alert('添加失败：' + e.message);
   } finally {
@@ -1735,48 +1609,27 @@ async function addNewSource() {
   }
 }
 
-// 删除来源（双模式）
 async function deleteSource(sourceId) {
   if (!confirm('确定删除此数据来源？')) return;
 
-  // 从 localStorage 删除
-  let localSources = getLocalCustomSources();
-  localSources = localSources.filter(s => s.id !== sourceId);
-  saveLocalCustomSources(localSources);
-
-  // 后端在线：也删除后端的数据
-  if (useRealAPI && !sourceId.startsWith('builtin_')) {
-    try {
-      await fetch(API_BASE + '/api/sources/' + sourceId, { method: 'DELETE' });
-    } catch (e) { /* 忽略 */ }
+  try {
+    const resp = await fetch(API_BASE + '/api/sources/' + sourceId, { method: 'DELETE' });
+    if (resp.ok) {
+      sourcesLoaded = false;
+      loadSources();
+      logger('info', '来源已删除', sourceId);
+    } else {
+      const data = await resp.json();
+      alert(data.error || '删除失败');
+    }
+  } catch (e) {
+    alert('删除失败：' + e.message);
   }
-
-  sourcesLoaded = false;
-  loadSources();
-  logger('info', '来源已删除', sourceId);
-}
-
-// ============ 抓取时包含自定义来源 ============
-// 在抓取前，将 localStorage 中的自定义来源通过参数传给后端
-function getCustomSourcesForScrape() {
-  return getLocalCustomSources().map(s => ({
-    url: s.url,
-    name: s.name,
-    type: s.type || 'auto',
-    category: s.category || '行业资讯',
-    region: s.region || '其他',
-  }));
 }
 
 async function fetchRealNews() {
-  // 触发抓取前，把 localStorage 中的自定义来源也发给后端
-  const customSources = getCustomSourcesForScrape();
-
-  const scrapeResp = await fetch(API_BASE + '/api/scrape?force=1', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ custom_sources: customSources }),
-  });
+  // 触发抓取
+  const scrapeResp = await fetch(API_BASE + '/api/scrape?force=1', { method: 'POST' });
   const scrapeData = await scrapeResp.json();
 
   if (scrapeData.status === 'cached') {
@@ -2634,17 +2487,9 @@ document.getElementById('articleModal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
 
-// Close addSourceModal on overlay click
-document.getElementById('addSourceModal').addEventListener('click', function(e) {
-  if (e.target === this) closeAddSourceModal();
-});
-
 // Close modal on Escape
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') {
-    closeModal();
-    closeAddSourceModal();
-  }
+  if (e.key === 'Escape') closeModal();
 });
 
 // Auto-detect backend on page load

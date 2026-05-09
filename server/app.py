@@ -71,6 +71,28 @@ def scrape():
     """触发一次完整抓取"""
     force = request.args.get('force', '0') == '1'
 
+    # 读取POST body中的自定义来源（由前端localStorage传来）
+    try:
+        body = request.get_json(silent=True) or {}
+        custom_sources_from_request = body.get('custom_sources', [])
+        if custom_sources_from_request:
+            # 合并到服务器端的 custom_sources.json（去重）
+            existing = load_custom_sources()
+            existing_urls = {s.get('url', '') for s in existing}
+            added = 0
+            for src in custom_sources_from_request:
+                url = src.get('url', '').rstrip('/')
+                if url and url not in existing_urls:
+                    src['id'] = src.get('id') or f'custom_{int(time.time())}'
+                    existing.append(src)
+                    existing_urls.add(url)
+                    added += 1
+            if added:
+                save_custom_sources(existing)
+                logger.info(f"合并了 {added} 个自定义来源到服务器")
+    except Exception as e:
+        logger.error(f"解析自定义来源失败: {e}")
+
     # 如果正在抓取中，返回进度
     if cache['scraping']:
         return jsonify({
